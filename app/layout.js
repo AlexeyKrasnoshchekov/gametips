@@ -32,10 +32,12 @@ export default function RootLayout({ children }) {
         rel="stylesheet"
         precedence="default"
       />
-      <body>{children}</body>
-      {/* Google Analytics + баннер согласия на cookie.
-          Рендерятся только если задан NEXT_PUBLIC_GA_ID. */}
-      <GoogleAnalyticsProvider />
+      <body>
+        {children}
+        {/* Google Analytics + баннер согласия на cookie.
+            Рендерятся только если задан NEXT_PUBLIC_GA_ID. */}
+        <GoogleAnalyticsProvider />
+      </body>
     </html>
   );
 }
