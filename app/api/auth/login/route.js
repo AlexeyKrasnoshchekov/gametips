@@ -12,7 +12,7 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  // The backend (gametips-server) owns the credential check (bcrypt compare
+  // The backend (gametips-server) owns the credential check 111 (bcrypt compare
   // against the MongoDB user store) — forward the credentials as-is.
   const result = await callAuthBackend('/login', {
     email: String(body?.email || ''),
