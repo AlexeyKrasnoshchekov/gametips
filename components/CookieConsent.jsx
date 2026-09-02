@@ -67,7 +67,7 @@ export default function CookieConsent() {
         <i className="fa-solid fa-cookie-bite"></i>{' '}
         We use cookies to improve and analyse your experience. Learn more in
         our{' '}
-        <a href="/privacy" className="cookie-consent-link">
+        <a href="/cookies" className="cookie-consent-link">
           cookie policy
         </a>
         .

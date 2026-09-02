@@ -700,6 +700,15 @@ footer i{color:var(--accent);}
 }
 .footer-privacy i{color:var(--accent);}
 .footer-privacy:hover{color:var(--accent);}
+/* Ряд ссылок на юридические страницы в подвале */
+.footer-legal{
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    flex-wrap:wrap;
+    margin-top:12px;
+}
+.footer-legal .footer-privacy{margin-top:0;}
 
 /* --- Header auth area --- */
 .signin-btn{

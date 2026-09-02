@@ -58,3 +58,33 @@
     font-size:13px;
 }
 .privacy-table tr:last-child td{border-bottom:none;}
+
+/* --- Общие блоки юридических страниц (privacy / terms / cookies) --- */
+.privacy-page h3{
+    font-size:16px;
+    margin:18px 0 4px;
+    color:var(--text);
+}
+.privacy-page ul{
+    margin:8px 0 8px 20px;
+    padding:0;
+    color:var(--text-dim);
+    font-size:15px;
+    line-height:1.6;
+}
+.privacy-page ul li{margin:4px 0;}
+.privacy-page ul strong{color:var(--text);}
+.privacy-page .legal-updated{
+    font-size:13px;
+    color:var(--text-dim);
+    margin:0 0 20px;
+}
+.privacy-page .legal-nav{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    margin-top:44px;
+    padding-top:18px;
+    border-top:1px solid var(--border);
+    font-size:14px;
+}
