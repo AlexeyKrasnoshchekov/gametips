@@ -158,6 +158,12 @@ export default function AuthModal({ open, onClose, notice, onAuthenticated }) {
               We&apos;ve sent a confirmation link to <strong>{registeredEmail}</strong>. Open the
               email and click the button to activate your account.
             </p>
+            <p className="auth-notice auth-notice-hint">
+              <strong>Can&apos;t find the email?</strong>
+              <br />
+              Check your spam or junk folder. If it is there, select the email and mark it as
+              &quot;Not Spam&quot; or &quot;Not Junk&quot; to make sure you get future updates.
+            </p>
             {!emailSent && (
               <p className="auth-error">
                 <i className="fa-solid fa-triangle-exclamation"></i> The email could not be sent

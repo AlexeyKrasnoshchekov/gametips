@@ -812,6 +812,13 @@ footer i{color:var(--accent);}
     padding:10px 12px;
     margin:0 0 16px;
 }
+/* Подсказка «Can't find the email?» — нейтральный блок без акцента-ошибки */
+.auth-notice-hint{
+    background:rgba(127,127,127,.08);
+    border:1px solid var(--border, rgba(127,127,127,.25));
+    color:var(--text-dim, #aaa);
+    margin-top:-8px;
+}
 .google-btn{
     display:flex;
     align-items:center;
