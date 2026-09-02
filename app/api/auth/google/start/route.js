@@ -1,6 +1,9 @@
-import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { OAUTH_STATE_COOKIE, oauthStateCookieOptions } from '@/lib/auth';
+import {
+  OAUTH_STATE_COOKIE,
+  createOAuthState,
+  oauthStateCookieOptions,
+} from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -8,17 +11,29 @@ export async function GET(req) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const url = new URL(req.url);
-  // Должен совпадать с Authorized redirect URI в Google Cloud Console
-  // (и с тем, что используется в callback-роуте).
+  // Канонический origin сайта. AUTH_ORIGIN обязателен на Netlify: внутри
+  // функции req.url может указывать на внутренний deploy-домен (*.netlify.app),
+  // а redirect_uri и все редиректы должны вести на публичный домен.
   const siteOrigin = (process.env.AUTH_ORIGIN || url.origin).replace(/\/+$/, '');
 
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL('/?authError=google_not_configured', url.origin));
+    return NextResponse.redirect(new URL('/?authError=google_not_configured', siteOrigin));
   }
 
-  // CSRF protection: a random state stored in a short-lived cookie must come
-  // back from Google unchanged in the callback.
-  const state = randomBytes(16).toString('base64url');
+  // Нормализация хоста: если start открыт на другом хосте (www, preview-домен
+  // *.netlify.app) — перезапускаем флоу с канонического, чтобы кука state и
+  // ответ Google жили на одном домене.
+  try {
+    if (new URL(siteOrigin).host !== url.host) {
+      return NextResponse.redirect(new URL('/api/auth/google/start', siteOrigin));
+    }
+  } catch {
+    // некорректный AUTH_ORIGIN — продолжаем как есть
+  }
+
+  // CSRF protection: подписанный state с TTL; дублируем его же в короткой куке
+  // — callback сверит куку, только если она доехала.
+  const state = createOAuthState();
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -32,5 +47,6 @@ export async function GET(req) {
 
   const res = NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   res.cookies.set(OAUTH_STATE_COOKIE, state, oauthStateCookieOptions());
+  res.headers.set('Cache-Control', 'no-store');
   return res;
 }

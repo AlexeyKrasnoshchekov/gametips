@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE,
   createSessionToken,
   sessionCookieOptions,
+  verifyOAuthState,
 } from '@/lib/auth';
 import { sessionUserFromBackend, syncGoogleUser } from '@/lib/authApi';
 
@@ -21,18 +22,28 @@ function decodeIdToken(idToken) {
 
 export async function GET(req) {
   const url = new URL(req.url);
-  const fail = (reason) => NextResponse.redirect(new URL(`/?authError=${reason}`, url.origin));
-  // AUTH_ORIGIN — явный override origin для redirect_uri (страхование от
-  // redirect_uri_mismatch, когда прокси отдаёт http/другой хост). Должен
-  // совпадать с тем, что прописано в Google Cloud Console.
+  // Канонический origin: внутри Netlify-функции url.origin может указывать на
+  // внутренний deploy-домен (*.netlify.app), поэтому ВСЕ редиректы (и ошибки,
+  // и успех) строим только от siteOrigin — иначе пользователь улетает на домен,
+  // где его сессия и куки не работают.
   const siteOrigin = (process.env.AUTH_ORIGIN || url.origin).replace(/\/+$/, '');
+  const fail = (reason) => {
+    const res = NextResponse.redirect(new URL(`/?authError=${reason}`, siteOrigin));
+    res.headers.set('Cache-Control', 'no-store');
+    return res;
+  };
 
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const store = await cookies();
-  const expectedState = store.get(OAUTH_STATE_COOKIE)?.value;
+  const stateCookie = store.get(OAUTH_STATE_COOKIE)?.value;
 
-  if (!code || !state || !expectedState || state !== expectedState) {
+  // Обязательна подпись и срок действия state (CSRF). Кука — дополнительная
+  // проверка: сверяем только если она доехала; её отсутствие флоу не ломает.
+  if (!code || !state || !verifyOAuthState(state)) {
+    return fail('invalid_state');
+  }
+  if (stateCookie && stateCookie !== state) {
     return fail('invalid_state');
   }
 
@@ -79,8 +90,9 @@ export async function GET(req) {
   const user = sessionUserFromBackend(sync.data.user, 'google');
   if (!user) return fail('google_profile_error');
 
-  const res = NextResponse.redirect(new URL('/', url.origin));
+  const res = NextResponse.redirect(new URL('/', siteOrigin));
   res.cookies.set(SESSION_COOKIE, createSessionToken(user), sessionCookieOptions());
   res.cookies.set(OAUTH_STATE_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
+  res.headers.set('Cache-Control', 'no-store');
   return res;
 }
