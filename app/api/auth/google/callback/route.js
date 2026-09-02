@@ -3,11 +3,10 @@ import { NextResponse } from 'next/server';
 import {
   OAUTH_STATE_COOKIE,
   SESSION_COOKIE,
-  attachGoogleProfile,
   createSessionToken,
-  publicUser,
   sessionCookieOptions,
 } from '@/lib/auth';
+import { sessionUserFromBackend, syncGoogleUser } from '@/lib/authApi';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +22,10 @@ function decodeIdToken(idToken) {
 export async function GET(req) {
   const url = new URL(req.url);
   const fail = (reason) => NextResponse.redirect(new URL(`/?authError=${reason}`, url.origin));
+  // AUTH_ORIGIN — явный override origin для redirect_uri (страхование от
+  // redirect_uri_mismatch, когда прокси отдаёт http/другой хост). Должен
+  // совпадать с тем, что прописано в Google Cloud Console.
+  const siteOrigin = (process.env.AUTH_ORIGIN || url.origin).replace(/\/+$/, '');
 
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
@@ -46,7 +49,7 @@ export async function GET(req) {
         code,
         client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: `${url.origin}/api/auth/google/callback`,
+        redirect_uri: `${siteOrigin}/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -59,9 +62,21 @@ export async function GET(req) {
   const profile = tokens?.id_token ? decodeIdToken(tokens.id_token) : null;
   const email = profile?.email;
 
+  // Токен получен напрямую с token-эндпоинта Google (аутентифицирован
+  // client_secret), поэтому подпись не проверяем — но aud должен быть наш.
   if (!email || profile.email_verified === false) return fail('google_profile_error');
+  if (profile.aud && profile.aud !== clientId) return fail('google_profile_error');
 
-  const user = attachGoogleProfile({ email, name: profile.name || profile.given_name });
+  // Пользователь хранится в MongoDB на бэкенде (та же база, что и у
+  // email-регистрации): создаём/привязываем аккаунт и берём его данные.
+  const sync = await syncGoogleUser({
+    email,
+    name: profile.name || profile.given_name,
+    googleId: profile.sub,
+  });
+  if (!sync.ok || !sync.data?.user) return fail('google_backend_error');
+
+  const user = sessionUserFromBackend(sync.data.user, 'google');
   if (!user) return fail('google_profile_error');
 
   const res = NextResponse.redirect(new URL('/', url.origin));

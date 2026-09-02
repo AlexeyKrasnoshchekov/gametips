@@ -8,6 +8,9 @@ export async function GET(req) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const url = new URL(req.url);
+  // Должен совпадать с Authorized redirect URI в Google Cloud Console
+  // (и с тем, что используется в callback-роуте).
+  const siteOrigin = (process.env.AUTH_ORIGIN || url.origin).replace(/\/+$/, '');
 
   if (!clientId || !clientSecret) {
     return NextResponse.redirect(new URL('/?authError=google_not_configured', url.origin));
@@ -19,7 +22,7 @@ export async function GET(req) {
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: `${url.origin}/api/auth/google/callback`,
+    redirect_uri: `${siteOrigin}/api/auth/google/callback`,
     response_type: 'code',
     scope: 'openid email profile',
     state,

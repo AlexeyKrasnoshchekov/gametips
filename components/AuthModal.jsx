@@ -9,6 +9,7 @@ export const AUTH_ERROR_MESSAGES = {
   google_token_error: 'Google did not accept the sign-in. Please try again.',
   google_unreachable: 'Could not reach Google. Check your connection and try again.',
   google_profile_error: 'Google did not return a usable profile. Please try another account.',
+  google_backend_error: 'Could not sync the Google account with the auth service. Please try again.',
 };
 
 export default function AuthModal({ open, onClose, notice, onAuthenticated }) {

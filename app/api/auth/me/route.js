@@ -14,14 +14,14 @@ export async function GET() {
   const localUser = findUserByEmail(session.email);
   if (localUser) return NextResponse.json({ user: publicUser(localUser) });
 
-  // Email/password users live in MongoDB (gametips-server) — rebuild the
-  // profile from the signed session payload.
+  // Users live in MongoDB (gametips-server) — rebuild the profile from the
+  // signed session payload. provider ('email' | 'google') сохранён в сессии.
   return NextResponse.json({
     user: {
       id: session.uid,
       email: session.email,
       name: session.name,
-      provider: 'email',
+      provider: session.provider || 'email',
     },
   });
 }
