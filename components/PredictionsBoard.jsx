@@ -191,8 +191,8 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
           <i className="fa-solid fa-futbol"></i> GameTips
         </div>
         <nav className="main-nav">
-          <a href="#" className="active">Home</a>
-          <a href="#">Best Picks</a>
+          <a href="/" className="active">Home</a>
+          <a href="/best-picks">Best Picks</a>
           <a href="#">Blog</a>
           <a href="#">About</a>
         </nav>
@@ -232,8 +232,8 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
       </header>
 
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
-        <a href="#" className="active">Home</a>
-        <a href="#">Best Picks</a>
+        <a href="/" className="active">Home</a>
+        <a href="/best-picks">Best Picks</a>
         <a href="#">Blog</a>
         <a href="#">About</a>
         {user ? (

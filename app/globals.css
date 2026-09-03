@@ -1066,3 +1066,105 @@ footer i{color:var(--accent);}
 .cookie-consent-btn.primary:hover{background:var(--accent-dim); border-color:var(--accent-dim);}
 
 
+
+/* ------- Best Picks page ------- */
+a.brand{text-decoration:none;}
+.picks-section{max-width:1200px;margin:0 auto;padding:0 32px 8px;}
+.picks-cat{
+    font-size:20px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin:30px 0 16px;
+}
+.picks-cat i{color:var(--accent);font-size:16px;}
+.picks-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:16px;
+}
+.pick-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px 18px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+.pick-card-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+}
+.pick-position{
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    color:var(--accent);
+    background:rgba(94,203,132,.12);
+    border:1px solid var(--accent-dim);
+    padding:3px 10px;
+    border-radius:12px;
+}
+.pick-res{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12.5px;
+    font-weight:600;
+    padding:3px 10px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    white-space:nowrap;
+}
+.pick-res.res-win{
+    color:var(--accent);
+    border-color:var(--accent-dim);
+    background:rgba(94,203,132,.1);
+}
+.pick-res.res-loss{
+    color:var(--danger);
+    border-color:rgba(224,116,95,.4);
+    background:rgba(224,116,95,.08);
+}
+.pick-value{
+    font-size:15.5px;
+    font-weight:600;
+    line-height:1.45;
+}
+.pick-confidence{
+    margin-top:auto;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+.pick-confidence-top{
+    display:flex;
+    justify-content:space-between;
+    font-size:12.5px;
+    color:var(--text-dim);
+}
+.pick-confidence-num{
+    color:var(--text);
+    font-weight:600;
+}
+.pick-confidence-bar{
+    height:6px;
+    border-radius:3px;
+    background:var(--bg-soft);
+    border:1px solid var(--border);
+    overflow:hidden;
+}
+.pick-confidence-bar span{
+    display:block;
+    height:100%;
+    background:var(--accent);
+    border-radius:3px;
+}
+/* ------- Best Picks page end ------- */
+
