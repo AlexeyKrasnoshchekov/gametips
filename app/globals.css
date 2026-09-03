@@ -1085,6 +1085,7 @@ a.brand{text-decoration:none;}
     gap:16px;
 }
 .pick-card{
+    position:relative;
     background:var(--card);
     border:1px solid var(--border);
     border-radius:14px;
@@ -1092,6 +1093,14 @@ a.brand{text-decoration:none;}
     display:flex;
     flex-direction:column;
     gap:12px;
+}
+/* Замыленные карточки для неавторизованных (аналог .card-locked на Home):
+   шапка карточки (позиция и коэффициент) видима, содержимое размыто. */
+.pick-card.pick-card-locked .pick-value,
+.pick-card.pick-card-locked .pick-confidence{
+    filter:blur(7px);
+    pointer-events:none;
+    user-select:none;
 }
 .pick-card-head{
     display:flex;
@@ -1109,6 +1118,20 @@ a.brand{text-decoration:none;}
     border:1px solid var(--accent-dim);
     padding:3px 10px;
     border-radius:12px;
+}
+.pick-odd{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:44px;
+    font-size:14px;
+    font-weight:700;
+    color:#0e1210;
+    background:var(--accent);
+    border:1px solid var(--accent);
+    padding:3px 10px;
+    border-radius:12px;
+    white-space:nowrap;
 }
 .pick-res{
     display:inline-flex;

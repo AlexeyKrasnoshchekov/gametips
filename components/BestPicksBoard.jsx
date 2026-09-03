@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchTodayPicks } from '@/lib/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fetchTodayPicks, formatDateForApi, getDayLabel } from '@/lib/api';
 import AuthModal, { AUTH_ERROR_MESSAGES } from './AuthModal';
 
 // ---------------------------------------------------------------------------
@@ -15,12 +15,13 @@ const NON_PICK_KEYS = new Set([
   'confidence',
   'result',
   'date',
+  'BookmakerOdd',
   'createdAt',
   'updatedAt',
   '__v',
 ]);
 
-// Человекочитаемые названия категорий прогнозов.
+// Человекочитаемые названия категорий прогнозов (с пробелами).
 const GROUP_LABELS = {
   Overal: 'Overall',
   TotalOver25: 'Total Over 2.5',
@@ -29,7 +30,11 @@ const GROUP_LABELS = {
   TotalUnder35: 'Total Under 3.5',
   TotalHomeWin: 'Home Win',
   TotalAwayWin: 'Away Win',
-  TotalBttsYes: 'BTTS — Yes',
+  TotalBttsYes: 'Btts Yes',
+  // Без префикса Total — запасные метки на случай отличающихся ключей в базе.
+  HomeWin: 'Home Win',
+  AwayWin: 'Away Win',
+  BttsYes: 'Btts Yes',
 };
 
 // Порядок секций на странице (неизвестные группы — в конце, по алфавиту).
@@ -47,9 +52,47 @@ const GROUP_ORDER = [
 const POSITION_LABELS = { First: '1st pick', Second: '2nd pick', Third: '3rd pick' };
 const POSITION_ORDER = { First: 1, Second: 2, Third: 3 };
 
+// Бесплатный лимит просмотра для неавторизованных — как на странице Home.
+const FREE_PREVIEW_LIMIT = 4;
+
+// Дневные фильтры — тот же состав, порядок и подписи, что на странице Home
+// (старые даты слева, Today последним).
+const dayOptions = [{ offset: 2 }, { offset: 1 }, { offset: 0 }];
+
 function parsePickKey(key) {
   const m = /^Today(.+?)(First|Second|Third)Pick$/.exec(String(key || ''));
   return m ? { group: m[1], position: m[2] } : null;
+}
+
+// Из строки прогноза достаёт только пару команд «Home vs Away» и отбрасывает
+// пояснения после разделителя:
+//   'Копенгаген vs Нордшелланд — Тотал Больше 2.5 (...)' -> 'Копенгаген vs Нордшелланд'
+//   'Sassuolo vs Frosinone - Over 1.5 Goals'             -> 'Sassuolo vs Frosinone'
+// Дефис внутри названия (Санкт-Петербург) НЕ является разделителем — срабатывают
+// только сочетания с пробелами вокруг ( — / - / – / ( ).
+function teamsFromValue(raw) {
+  const s = String(raw || '').trim();
+  const m = /^(.*?)\s+vs\s+(.*)$/i.exec(s);
+  if (!m) return s;
+  let away = m[2].trim();
+  const cut = away.search(/[—–-]\s|\s[—–-]|\s\(|\(/);
+  if (cut !== -1) away = away.slice(0, cut).trim();
+  return `${m[1].trim()} vs ${away}`;
+}
+
+// Убирает ВЕСЬ текст в круглых скобках (в т.ч. вложенные), схлопывает лишние
+// пробелы. Для раздела Overall пояснение сохраняется, а скобочные комментарии
+// («главный выбор дня…», «(BTTS Yes)»…) отбрасываются:
+//   'Копенгаген vs Нордшелланд — ТБ 1.5 (главный выбор дня, 9...)' -> 'Копенгаген vs Нордшелланд — ТБ 1.5'
+//   'Базель vs Сьон — Обе забьют (BTTS Yes) (11 из 12 источников)' -> 'Базель vs Сьон — Обе забьют'
+function stripParentheticals(raw) {
+  let s = String(raw || '').trim();
+  let prev = null;
+  while (prev !== s) {
+    prev = s;
+    s = s.replace(/\([^()]*\)/g, '').replace(/\s{2,}/g, ' ').trim();
+  }
+  return s;
 }
 
 function normalizePick(elem) {
@@ -59,12 +102,24 @@ function normalizePick(elem) {
   const parsed = parsePickKey(pickKey);
   if (!parsed) return null;
 
+  const value = String(elem[pickKey] ?? '').trim();
+  const odd = Number(elem.BookmakerOdd);
+  const bookmakerOdd = Number.isFinite(odd) ? odd : null;
+
   return {
     key: pickKey,
     group: parsed.group,
     position: parsed.position,
-    value: String(elem[pickKey] ?? '').trim(),
+    value,
+    teams: teamsFromValue(value),
+    // В разделе Overall оставляем пояснение (без текста в скобках),
+    // в остальных разделах — только пару команд «Home vs Away».
+    display:
+      parsed.group === 'Overal'
+        ? stripParentheticals(value)
+        : teamsFromValue(value),
     confidence: Number(elem.confidence) || 0,
+    bookmakerOdd,
     result: String(elem.result ?? '').trim(),
     date: String(elem.date || ''),
   };
@@ -102,49 +157,6 @@ function groupPicks(picks) {
     });
 }
 
-// result приходит из дашборда: '' — ещё не сыграло, иначе строка.
-// Известные значения сводим к win/loss, произвольные показываем как есть.
-function resultKind(result) {
-  const r = result.toLowerCase();
-  if (['true', 'win', 'won', 'yes', 'positive', '+', '1'].includes(r)) {
-    return 'win';
-  }
-  if (['false', 'lose', 'lost', 'no', 'negative', '-', '0'].includes(r)) {
-    return 'loss';
-  }
-  return 'info';
-}
-
-function ResultBadge({ result }) {
-  if (!result) {
-    return (
-      <span className="pick-res res-pending" title="Not played yet">
-        <i className="fa-regular fa-clock"></i> Pending
-      </span>
-    );
-  }
-  const kind = resultKind(result);
-  if (kind === 'win') {
-    return (
-      <span className="pick-res res-win" title="Prediction won">
-        <i className="fa-solid fa-check"></i> Won
-      </span>
-    );
-  }
-  if (kind === 'loss') {
-    return (
-      <span className="pick-res res-loss" title="Prediction lost">
-        <i className="fa-solid fa-minus"></i> Lost
-      </span>
-    );
-  }
-  return (
-    <span className="pick-res res-info" title="Result">
-      <i className="fa-solid fa-flag-checkered"></i> {result}
-    </span>
-  );
-}
-
 export default function BestPicksBoard({ initialPicks, initialError }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [picks, setPicks] = useState(initialPicks);
@@ -153,6 +165,9 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
   const [user, setUser] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
+  const [selectedOffset, setSelectedOffset] = useState(0);
+
+  const skipFirstFetch = useRef(true);
 
   // Восстановление сессии и ?authError= из Google OAuth callback —
   // та же логика, что и на главной странице.
@@ -200,24 +215,66 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
     }
   }, []);
 
+  const loadData = useCallback(
+    (offset = selectedOffset) => {
+      setLoading(true);
+      setError(null);
+      fetchTodayPicks(formatDateForApi(offset))
+        .then((data) => setPicks(Array.isArray(data) ? data : []))
+        .catch((err) => {
+          console.warn('[GameTips] Backend unavailable.', err);
+          setPicks([]);
+          setError('Could not load best picks from the server. Please try again.');
+        })
+        .finally(() => setLoading(false));
+    },
+    [selectedOffset],
+  );
+
+  // Первый рендер уже наполнен серверными данными (сегодняшние подборки),
+  // поэтому повторный запрос делаем только при смене дня или Refresh / Try again.
+  useEffect(() => {
+    if (skipFirstFetch.current) {
+      skipFirstFetch.current = false;
+      return;
+    }
+    loadData(selectedOffset);
+  }, [selectedOffset, loadData]);
+
   const refresh = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    fetchTodayPicks()
-      .then((data) => setPicks(Array.isArray(data) ? data : []))
-      .catch((err) => {
-        console.warn('[GameTips] Backend unavailable.', err);
-        setPicks([]);
-        setError('Could not load best picks from the server. Please try again.');
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    loadData(selectedOffset);
+  }, [loadData, selectedOffset]);
 
   // В state всегда сырые документы API (и из SSR-пропсов, и из refresh);
   // нормализация — единая точка здесь, чтобы SSR и клиент вели себя одинаково.
   const normalizedPicks = useMemo(() => normalizePicks(picks), [picks]);
   const sections = useMemo(() => groupPicks(normalizedPicks), [normalizedPicks]);
-  const picksDate = normalizedPicks.find((p) => p.date)?.date || '';
+
+  // Бесплатный просмотр для неавторизованных — как на странице Home:
+  // видно максимум 4 карточки, причём не более одной в каждой категории.
+  // Бесплатными становятся первые (1st pick) карточки первых категорий —
+  // выбор детерминированный, поэтому SSR и гидрация всегда совпадают.
+  const freePickKeys = useMemo(() => {
+    if (user) return null; // авторизован — открыто всё
+    const keys = new Set();
+    for (const section of sections) {
+      if (keys.size >= FREE_PREVIEW_LIMIT) break;
+      if (section.picks.length > 0) keys.add(section.picks[0].key);
+    }
+    return keys;
+  }, [user, sections]);
+
+  // Ключ первой замыленной карточки — на ней показываем подсказку
+  // "Sign In to see more..." (для авторизованных подсказки нет).
+  const firstLockedKey = useMemo(() => {
+    if (user || !freePickKeys) return null;
+    for (const section of sections) {
+      for (const pick of section.picks) {
+        if (!freePickKeys.has(pick.key)) return pick.key;
+      }
+    }
+    return null;
+  }, [user, sections, freePickKeys]);
 
   return (
     <>
@@ -254,8 +311,8 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
             </button>
           )}
           <div className="date-badge">
-            <i className="fa-regular fa-calendar"></i>{' '}
-            <span>{picksDate || 'Best Picks'}</span>
+            <i className="fa-solid fa-bullseye"></i>{' '}
+            <span>Best Picks</span>
           </div>
           <button
             className="burger"
@@ -290,20 +347,33 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
       </div>
 
       <section className="hero">
-        <h1>Best picks for today</h1>
+        <h1>
+          {selectedOffset === 0
+            ? 'Best picks for today'
+            : `Best picks for ${getDayLabel(selectedOffset)}`}
+        </h1>
         <p>
           The strongest single picks of the day across every market — overall,
           totals, match result and BTTS — with a confidence score for each tip.
         </p>
       </section>
 
-      <div className="filters">
-        {picksDate && (
-          <span className="date-badge">
+      {/* Фильтры дней — той же раскладкой, что на странице Home:
+          отдельная строка с кнопками дней + строка с Refresh справа. */}
+      <div className="filters" style={{ paddingBottom: '0' }}>
+        {dayOptions.map((opt) => (
+          <button
+            key={opt.offset}
+            className={`filter-btn ${selectedOffset === opt.offset ? 'active' : ''}`}
+            onClick={() => setSelectedOffset(opt.offset)}
+          >
             <i className="fa-regular fa-calendar-days"></i>{' '}
-            <span>{picksDate}</span>
-          </span>
-        )}
+            {getDayLabel(opt.offset)}
+          </button>
+        ))}
+      </div>
+
+      <div className="filters" style={{ gap: '18px', marginTop: '16px' }}>
         <button
           className="filter-btn"
           onClick={refresh}
@@ -348,15 +418,34 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                 <i className="fa-solid fa-bullseye"></i> {section.label}
               </h2>
               <div className="picks-grid">
-                {section.picks.map((pick) => (
-                  <article className="pick-card" key={pick.key}>
+                {section.picks.map((pick) => {
+                  const locked =
+                    !user && freePickKeys && !freePickKeys.has(pick.key);
+                  return (
+                  <article
+                    className={`pick-card ${locked ? 'pick-card-locked' : ''}`}
+                    key={pick.key}
+                  >
                     <div className="pick-card-head">
                       <span className="pick-position">
                         {POSITION_LABELS[pick.position] || pick.position}
                       </span>
-                      <ResultBadge result={pick.result} />
+                      <span className="pick-odd" title="Bookmaker odd">
+                        {pick.bookmakerOdd !== null ? pick.bookmakerOdd : '—'}
+                      </span>
                     </div>
-                    <p className="pick-value">{pick.value}</p>
+                    <p className="pick-value">{pick.display}</p>
+                    {locked && pick.key === firstLockedKey && (
+                      <button
+                        type="button"
+                        className="card-lock-hint"
+                        onClick={() => setAuthOpen(true)}
+                        aria-label="Sign in to see more picks"
+                      >
+                        <i className="fa-solid fa-lock"></i> Sign In to see
+                        more...
+                      </button>
+                    )}
                     <div className="pick-confidence">
                       <div className="pick-confidence-top">
                         <span>Confidence</span>
@@ -379,7 +468,8 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                       </div>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))}
