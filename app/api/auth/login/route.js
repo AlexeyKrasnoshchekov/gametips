@@ -12,12 +12,28 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  // The backend (gametips-server) owns the credential check 111 (bcrypt compare
-  // against the MongoDB user store) — forward the credentials as-is.
-  const result = await callAuthBackend('/login', {
-    email: String(body?.email || ''),
-    password: String(body?.password || ''),
-  });
+  // Клиент (новая версия) считает SHA-256 пароля в браузере и присылает только
+  // passwordHash — открытый пароль не передаётся по сети. Бэкенд
+  // (gametips-server) bcrypt-ит полученный хэш и сверяет с MongoDB.
+  // Старые закэшированные клиенты ещё присылают открытый пароль в password —
+  // на переходный период пробрасываем его как есть, бэкенд понимает оба варианта.
+  const passwordHash =
+    typeof body?.passwordHash === 'string' && body.passwordHash
+      ? body.passwordHash.trim().toLowerCase()
+      : null;
+  const legacyPassword =
+    typeof body?.password === 'string' && body.password ? body.password : null;
+
+  if (!passwordHash && !legacyPassword) {
+    return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
+  }
+
+  const result = await callAuthBackend(
+    '/login',
+    passwordHash
+      ? { email: String(body?.email || ''), passwordHash }
+      : { email: String(body?.email || ''), password: legacyPassword },
+  );
 
   if (!result.ok) {
     return NextResponse.json(

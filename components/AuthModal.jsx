@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { hashPassword } from '@/lib/password';
 
 export const AUTH_ERROR_MESSAGES = {
   google_not_configured:
@@ -67,10 +68,13 @@ export default function AuthModal({ open, onClose, notice, onAuthenticated }) {
     setBusy(true);
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      // SHA-256 пароля считается в браузере: на сервер уходит только хэш,
+      // открытый пароль не передаётся по сети.
+      const passwordHash = await hashPassword(password);
       const payload =
         mode === 'login'
-          ? { email, password }
-          : { email, password, name };
+          ? { email, passwordHash }
+          : { email, passwordHash, name };
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,10 +109,12 @@ export default function AuthModal({ open, onClose, notice, onAuthenticated }) {
     setResendNote('');
     setBusy(true);
     try {
+      // Тот же принцип: только SHA-256 хэш пароля, открытый пароль не передаётся.
+      const passwordHash = await hashPassword(password);
       const res = await fetch('/api/auth/resend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, passwordHash }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {

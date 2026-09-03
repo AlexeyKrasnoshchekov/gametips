@@ -11,13 +11,27 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  // The backend (gametips-server) owns validation, bcrypt hashing and the
-  // MongoDB user store — forward the credentials as-is and map its
-  // `{ message }` errors onto the `{ error }` shape the UI expects.
+  // Клиент присылает passwordHash = SHA-256(password) (считается в браузере).
+  // Бэкенд (gametips-server) owns validation, bcrypt hashing и MongoDB user
+  // store. Старые закэшированные клиенты ещё присылают открытый пароль в
+  // password — на переходный период пробрасываем его как есть.
+  const passwordHash =
+    typeof body?.passwordHash === 'string' && body.passwordHash
+      ? body.passwordHash.trim().toLowerCase()
+      : null;
+  const legacyPassword =
+    typeof body?.password === 'string' && body.password ? body.password : null;
+
+  if (!passwordHash && !legacyPassword) {
+    return NextResponse.json({ error: 'Name, email and password are required.' }, { status: 400 });
+  }
+
+  const credentials = passwordHash ? { passwordHash } : { password: legacyPassword };
+
   const result = await callAuthBackend('/register', {
     name: String(body?.name || ''),
     email: String(body?.email || ''),
-    password: String(body?.password || ''),
+    ...credentials,
   });
 
   if (!result.ok) {
