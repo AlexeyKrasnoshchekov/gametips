@@ -4,14 +4,23 @@ import AuthProvider from '@/components/AuthContext';
 import { SITE_URL } from '@/lib/site';
 
 export const metadata = {
-  title: "FootTips — Today's Football Predictions",
+  title: "GameTips — Today's Football Predictions",
   description:
-    "Fresh betting tips for today's matches from the FootTips analyst team.",
+    "Fresh betting tips for today's matches from the GameTips analyst team.",
   metadataBase: new URL(SITE_URL),
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   openGraph: {
-    title: "FootTips — Today's Football Predictions",
+    title: "GameTips — Today's Football Predictions",
     description:
-      "Fresh betting tips for today's matches from the FootTips analyst team.",
+      "Fresh betting tips for today's matches from the GameTips analyst team.",
     type: 'website',
   },
 };

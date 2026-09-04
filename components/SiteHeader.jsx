@@ -35,7 +35,13 @@ export default function SiteHeader({ badge }) {
     <>
       <header>
         <a className="brand" href="/">
-          <i className="fa-solid fa-futbol"></i> GameTips
+          <img
+            src="/logo.webp"
+            alt="GameTips"
+            width={598}
+            height={128}
+            className="brand-logo"
+          />
         </a>
         <nav className="main-nav">
           {NAV_LINKS.map((link) => (

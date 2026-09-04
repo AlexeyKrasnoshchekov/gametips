@@ -42,6 +42,7 @@ header{
     color:var(--text);
 }
 .brand i{color:var(--accent);}
+.brand-logo{height:36px;width:auto;display:block;}
 .date-badge{
     font-size:14px;
     color:var(--text-dim);
@@ -949,6 +950,7 @@ footer i{color:var(--accent);}
     main{padding:0 18px 60px;}
     .date-badge{display:none;}
     .signin-label{display:none;}
+    .brand-logo{height:30px;}
     .signin-btn{padding:8px 10px;}
 }
 @media (max-width:820px){
