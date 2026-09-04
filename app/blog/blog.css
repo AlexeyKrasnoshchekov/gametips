@@ -1,0 +1,70 @@
+/* Дополнительные стили блога поверх общих классов юридических страниц
+   (.privacy-page импортируется из app/privacy/privacy.css). */
+
+.blog-page h1 {
+  margin-bottom: 4px;
+}
+
+.blog-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.blog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.blog-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.blog-card .blog-card-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.blog-card h2 {
+  font-size: 18px;
+  line-height: 1.35;
+  margin: 0;
+  color: var(--text);
+}
+
+.blog-card p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.blog-card .read-more {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Страница отдельной статьи */
+.blog-article h1 {
+  margin-bottom: 6px;
+}
+
+.blog-article .legal-updated {
+  margin-bottom: 24px;
+}

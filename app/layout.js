@@ -1,11 +1,13 @@
 import './globals.css';
 import GoogleAnalyticsProvider from '@/components/GoogleAnalyticsProvider';
+import AuthProvider from '@/components/AuthContext';
+import { SITE_URL } from '@/lib/site';
 
 export const metadata = {
   title: "FootTips — Today's Football Predictions",
   description:
     "Fresh betting tips for today's matches from the FootTips analyst team.",
-  metadataBase: new URL('https://gametips.bet'),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     title: "FootTips — Today's Football Predictions",
     description:
@@ -33,7 +35,10 @@ export default function RootLayout({ children }) {
         precedence="default"
       />
       <body>
-        {children}
+        {/* Общее состояние авторизации (user, AuthModal) для всех страниц. */}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         {/* Google Analytics + баннер согласия на cookie.
             Рендерятся только если задан NEXT_PUBLIC_GA_ID. */}
         <GoogleAnalyticsProvider />

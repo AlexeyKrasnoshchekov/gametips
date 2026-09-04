@@ -1,4 +1,6 @@
 import '../privacy/privacy.css';
+import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 
 export const metadata = {
   title: 'Terms of Service — GameTips',
@@ -8,6 +10,8 @@ export const metadata = {
 
 export default function TermsPage() {
   return (
+    <>
+      <SiteHeader />
     <main className="privacy-page">
       <h1>Terms of Service</h1>
       <p className="legal-updated">Last updated: September 2, 2026</p>
@@ -142,5 +146,7 @@ export default function TermsPage() {
         <a href="/">Back to GameTips</a>
       </nav>
     </main>
+      <SiteFooter />
+    </>
   );
 }

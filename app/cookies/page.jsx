@@ -1,4 +1,6 @@
 import '../privacy/privacy.css';
+import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 
 export const metadata = {
   title: 'Cookie Policy — GameTips',
@@ -43,6 +45,8 @@ export default function CookiePolicyPage() {
   ];
 
   return (
+    <>
+      <SiteHeader />
     <main className="privacy-page">
       <h1>Cookie Policy</h1>
       <p className="legal-updated">Last updated: September 2, 2026</p>
@@ -128,5 +132,7 @@ export default function CookiePolicyPage() {
         <a href="/">Back to GameTips</a>
       </nav>
     </main>
+      <SiteFooter />
+    </>
   );
 }

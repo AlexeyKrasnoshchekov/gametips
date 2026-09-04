@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTodayPicks, formatDateForApi, getDayLabel } from '@/lib/api';
-import AuthModal, { AUTH_ERROR_MESSAGES } from './AuthModal';
+import SiteHeader from './SiteHeader';
+import SiteFooter from './SiteFooter';
+import { useAuth } from './AuthContext';
 
 // ---------------------------------------------------------------------------
 // Разбор данных TodayPicks (коллекция заполняется загрузкой JSON в дашборде).
@@ -158,62 +160,17 @@ function groupPicks(picks) {
 }
 
 export default function BestPicksBoard({ initialPicks, initialError }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [picks, setPicks] = useState(initialPicks);
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState(null);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authNotice, setAuthNotice] = useState('');
   const [selectedOffset, setSelectedOffset] = useState(0);
 
   const skipFirstFetch = useRef(true);
 
-  // Восстановление сессии и ?authError= из Google OAuth callback —
-  // та же логика, что и на главной странице.
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && data?.user) setUser(data.user);
-      })
-      .catch(() => {});
-
-    const params = new URLSearchParams(window.location.search);
-    const authError = params.get('authError');
-    if (authError) {
-      params.delete('authError');
-      const qs = params.toString();
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${qs ? `?${qs}` : ''}`,
-      );
-      if (!cancelled) {
-        setAuthNotice(AUTH_ERROR_MESSAGES[authError] || 'Sign-in failed. Please try again.');
-        setAuthOpen(true);
-      }
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleAuthenticated = useCallback((nextUser) => {
-    setUser(nextUser);
-    setAuthNotice('');
-    setAuthOpen(false);
-  }, []);
-
-  const handleSignOut = useCallback(async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } finally {
-      setUser(null);
-    }
-  }, []);
+  // Состояние авторизации живёт в общем AuthProvider (см. app/layout.js):
+  // один запрос /api/auth/me на страницу, один AuthModal и общая обработка
+  // ?authError= / ?verified= вместо дублирования в каждом борде.
+  const { user, openAuth } = useAuth();
 
   const loadData = useCallback(
     (offset = selectedOffset) => {
@@ -278,73 +235,14 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
 
   return (
     <>
-      <header>
-        <a className="brand" href="/">
-          <i className="fa-solid fa-futbol"></i> GameTips
-        </a>
-        <nav className="main-nav">
-          <a href="/">Home</a>
-          <a href="/best-picks" className="active">Best Picks</a>
-          <a href="#">Blog</a>
-          <a href="#">About</a>
-        </nav>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {user ? (
-            <div className="user-chip" title={user.email}>
-              <span className="user-avatar">
-                {(user.name || user.email || '?').charAt(0).toUpperCase()}
-              </span>
-              <span className="user-name">{user.name}</span>
-              <button
-                className="user-signout"
-                onClick={handleSignOut}
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <i className="fa-solid fa-arrow-right-from-bracket"></i>
-              </button>
-            </div>
-          ) : (
-            <button className="signin-btn" onClick={() => setAuthOpen(true)}>
-              <i className="fa-solid fa-user"></i>
-              <span className="signin-label">Sign in</span>
-            </button>
-          )}
-          <div className="date-badge">
-            <i className="fa-solid fa-bullseye"></i>{' '}
-            <span>Best Picks</span>
-          </div>
-          <button
-            className="burger"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Toggle menu"
-          >
-            <i className={menuOpen ? 'fa-solid fa-xmark' : 'fa-solid fa-bars'}></i>
-          </button>
-        </div>
-      </header>
-
-      <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
-        <a href="/">Home</a>
-        <a href="/best-picks" className="active">Best Picks</a>
-        <a href="#">Blog</a>
-        <a href="#">About</a>
-        {user ? (
-          <button className="mobile-auth-btn" onClick={handleSignOut}>
-            <i className="fa-solid fa-arrow-right-from-bracket"></i> Sign out ({user.name})
-          </button>
-        ) : (
-          <button
-            className="mobile-auth-btn"
-            onClick={() => {
-              setMenuOpen(false);
-              setAuthOpen(true);
-            }}
-          >
-            <i className="fa-solid fa-user"></i> Sign in
-          </button>
-        )}
-      </div>
+      {/* Хедер/футер — общие компоненты; бейдж — название раздела. */}
+      <SiteHeader
+        badge={
+          <>
+            <i className="fa-solid fa-bullseye"></i> <span>Best Picks</span>
+          </>
+        }
+      />
 
       <section className="hero">
         <h1>
@@ -439,7 +337,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                       <button
                         type="button"
                         className="card-lock-hint"
-                        onClick={() => setAuthOpen(true)}
+                        onClick={openAuth}
                         aria-label="Sign in to see more picks"
                       >
                         <i className="fa-solid fa-lock"></i> Sign In to see
@@ -475,32 +373,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
           ))}
       </main>
 
-      <footer>
-        <p>
-          <i className="fa-solid fa-triangle-exclamation"></i> Betting involves
-          risk. Information is provided for guidance only; responsibility for
-          decisions lies with the user.
-        </p>
-        <div className="footer-legal">
-          <a className="footer-privacy" href="/privacy">
-            <i className="fa-solid fa-shield-halved"></i> Privacy Policy
-          </a>
-          <a className="footer-privacy" href="/terms">
-            <i className="fa-solid fa-file-contract"></i> Terms of Service
-          </a>
-          <a className="footer-privacy" href="/cookies">
-            <i className="fa-solid fa-cookie-bite"></i> Cookie Policy
-          </a>
-        </div>
-      </footer>
-
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        notice={authNotice}
-        onAuthenticated={handleAuthenticated}
-      />
-
+      <SiteFooter />
     </>
   );
 }

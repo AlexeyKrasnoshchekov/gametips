@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchMatches, formatDateForApi, getDayLabel, getTodayLabel, sortMatches } from '@/lib/api';
 import { filterOptions } from '@/config/filters';
 import MatchCard from './MatchCard';
-import AuthModal, { AUTH_ERROR_MESSAGES } from './AuthModal';
+import SiteHeader from './SiteHeader';
+import SiteFooter from './SiteFooter';
+import { useAuth } from './AuthContext';
 
 const dayOptions = [
   { offset: 2 },
@@ -14,14 +16,10 @@ const dayOptions = [
 
 export default function PredictionsBoard({ initialMatches, initialError }) {
   const [filterType, setFilterType] = useState('all');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [matches, setMatches] = useState(initialMatches);
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [selectedOffset, setSelectedOffset] = useState(0);
-  const [user, setUser] = useState(null);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authNotice, setAuthNotice] = useState('');
 
   const skipFirstFetch = useRef(true);
 
@@ -34,72 +32,10 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
   // otherwise the filter's date, e.g. "27 August".
   const heroDay = selectedOffset === 0 ? "today's" : getDayLabel(selectedOffset);
 
-  // Restore the session on load and surface any ?authError= that came back
-  // from the Google OAuth callback.
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && data?.user) setUser(data.user);
-      })
-      .catch(() => {});
-
-    const params = new URLSearchParams(window.location.search);
-    const authError = params.get('authError');
-    if (authError) {
-      params.delete('authError');
-      const qs = params.toString();
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${qs ? `?${qs}` : ''}`,
-      );
-      if (!cancelled) {
-        setAuthNotice(AUTH_ERROR_MESSAGES[authError] || 'Sign-in failed. Please try again.');
-        setAuthOpen(true);
-      }
-    }
-
-    // The email confirmation link lands back on the home page as /?verified=1|0
-    // (the backend /prod/verify endpoint redirects here after checking the token).
-    const verified = params.get('verified');
-    if (verified === '1' || verified === '0') {
-      params.delete('verified');
-      const qs = params.toString();
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${qs ? `?${qs}` : ''}`,
-      );
-      if (!cancelled) {
-        setAuthNotice(
-          verified === '1'
-            ? 'Email confirmed! Please sign in with your credentials.'
-            : 'The confirmation link is invalid or has expired. Please sign in and resend the confirmation email.',
-        );
-        setAuthOpen(true);
-      }
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleAuthenticated = useCallback((nextUser) => {
-    setUser(nextUser);
-    setAuthNotice('');
-    setAuthOpen(false);
-  }, []);
-
-  const handleSignOut = useCallback(async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } finally {
-      setUser(null);
-    }
-  }, []);
+  // Состояние авторизации живёт в общем AuthProvider (см. app/layout.js):
+  // один запрос /api/auth/me на страницу, один AuthModal и общая обработка
+  // ?authError= / ?verified= вместо дублирования в каждом борде.
+  const { user, openAuth } = useAuth();
 
   const loadData = useCallback(
     (offset = selectedOffset) => {
@@ -186,72 +122,14 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
 
   return (
     <>
-      <header>
-        <div className="brand">
-          <i className="fa-solid fa-futbol"></i> GameTips
-        </div>
-        <nav className="main-nav">
-          <a href="/" className="active">Home</a>
-          <a href="/best-picks">Best Picks</a>
-          <a href="#">Blog</a>
-          <a href="#">About</a>
-        </nav>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {user ? (
-            <div className="user-chip" title={user.email}>
-              <span className="user-avatar">
-                {(user.name || user.email || '?').charAt(0).toUpperCase()}
-              </span>
-              <span className="user-name">{user.name}</span>
-              <button
-                className="user-signout"
-                onClick={handleSignOut}
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <i className="fa-solid fa-arrow-right-from-bracket"></i>
-              </button>
-            </div>
-          ) : (
-            <button className="signin-btn" onClick={() => setAuthOpen(true)}>
-              <i className="fa-solid fa-user"></i>
-              <span className="signin-label">Sign in</span>
-            </button>
-          )}
-          <div className="date-badge">
+      {/* Хедер/футер — общие компоненты; бейдж даты следует выбранному дню. */}
+      <SiteHeader
+        badge={
+          <>
             <i className="fa-regular fa-calendar"></i> <span>{todayDate}</span>
-          </div>
-          <button
-            className="burger"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Toggle menu"
-          >
-            <i className={menuOpen ? 'fa-solid fa-xmark' : 'fa-solid fa-bars'}></i>
-          </button>
-        </div>
-      </header>
-
-      <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
-        <a href="/" className="active">Home</a>
-        <a href="/best-picks">Best Picks</a>
-        <a href="#">Blog</a>
-        <a href="#">About</a>
-        {user ? (
-          <button className="mobile-auth-btn" onClick={handleSignOut}>
-            <i className="fa-solid fa-arrow-right-from-bracket"></i> Sign out ({user.name})
-          </button>
-        ) : (
-          <button
-            className="mobile-auth-btn"
-            onClick={() => {
-              setMenuOpen(false);
-              setAuthOpen(true);
-            }}
-          >
-            <i className="fa-solid fa-user"></i> Sign in
-          </button>
-        )}
-      </div>
+          </>
+        }
+      />
 
       <section className="hero">
         <h1>Predictions and tips for {heroDay} matches</h1>
@@ -329,7 +207,7 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
                     showResult={selectedOffset > 0}
                     locked={!user && !freeMatchIndexes.has(i)}
                     lockHint={i === firstLockedIndex}
-                    onSignInClick={() => setAuthOpen(true)}
+                    onSignInClick={openAuth}
                     key={i}
                   />
                 ))}
@@ -339,31 +217,7 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
         )}
       </main>
 
-      <footer>
-        <p>
-          <i className="fa-solid fa-triangle-exclamation"></i> Betting involves
-          risk. Information is provided for guidance only; responsibility for
-          decisions lies with the user.
-        </p>
-        <div className="footer-legal">
-          <a className="footer-privacy" href="/privacy">
-            <i className="fa-solid fa-shield-halved"></i> Privacy Policy
-          </a>
-          <a className="footer-privacy" href="/terms">
-            <i className="fa-solid fa-file-contract"></i> Terms of Service
-          </a>
-          <a className="footer-privacy" href="/cookies">
-            <i className="fa-solid fa-cookie-bite"></i> Cookie Policy
-          </a>
-        </div>
-      </footer>
-
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        notice={authNotice}
-        onAuthenticated={handleAuthenticated}
-      />
+      <SiteFooter />
     </>
   );
 }

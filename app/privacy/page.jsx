@@ -1,4 +1,6 @@
 import './privacy.css';
+import SiteHeader from '@/components/SiteHeader';
+import SiteFooter from '@/components/SiteFooter';
 
 export const metadata = {
   title: 'Privacy Policy — GameTips',
@@ -8,6 +10,8 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
+    <>
+      <SiteHeader />
     <main className="privacy-page">
       <h1>Privacy Policy</h1>
       <p className="legal-updated">Last updated: September 2, 2026</p>
@@ -171,5 +175,7 @@ export default function PrivacyPage() {
         <a href="/">Back to GameTips</a>
       </nav>
     </main>
+      <SiteFooter />
+    </>
   );
 }
