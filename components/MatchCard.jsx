@@ -278,7 +278,9 @@ export default function MatchCard({
       : significantStats.filter((s) => s.type === filterType);
   if (visibleStats.length === 0) return null;
 
-  const scores = aggregateScores(match.correctScore.sources).slice(0, 3);
+  const scores = aggregateScores(
+    (match.correctScore && match.correctScore.sources) || [],
+  ).slice(0, 3);
 
   return (
     <>
@@ -375,7 +377,7 @@ export default function MatchCard({
           </div>
         ))}
       </div>
-      {filterType === 'all' && scores.length > 0 && (
+      {scores.length > 0 && (
         <div className="correct-score-box">
           <div className="cs-title">Predicted Score</div>
           <div className="cs-row">
