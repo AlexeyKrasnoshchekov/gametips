@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchMatches, formatDateForApi, getDayLabel, getTodayLabel, sortMatches } from '@/lib/api';
+import { fetchMatches, formatDateForApi, getDayLabel, getTodayLabel, sortMatchesByFilter } from '@/lib/api';
 import { filterOptions } from '@/config/filters';
 import MatchCard from './MatchCard';
 import SiteHeader from './SiteHeader';
@@ -20,6 +20,14 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [selectedOffset, setSelectedOffset] = useState(0);
+
+  // Пересортировка при смене фильтра. Используется и для серверного рендера
+  // (initialMatches — уже отсортированные по allCount), и после загрузки данных
+  // с сервера: sortedMatches всегда отдаёт правильный порядок для текущего фильтра.
+  const sortedMatches = useMemo(
+    () => sortMatchesByFilter(matches, filterType),
+    [matches, filterType],
+  );
 
   const skipFirstFetch = useRef(true);
 
@@ -42,9 +50,7 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
       setLoading(true);
       setError(null);
       fetchMatches(formatDateForApi(offset))
-        .then((data) =>
-          setMatches(Array.isArray(data) ? sortMatches(data) : []),
-        )
+        .then((data) => setMatches(Array.isArray(data) ? data : []))
         .catch((err) => {
           console.warn('[GameTips] Backend unavailable.', err);
           setMatches([]);
@@ -90,7 +96,7 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
       if (candidates.length === 0) return null;
       return candidates[Math.floor(rand() * candidates.length)];
     };
-    const total = matches.length;
+    const total = sortedMatches.length;
     const picked = new Set();
     // Одна бесплатная карточка из первых трёх (#1–#3)
     const first = pickFrom([0, 1, 2].filter((i) => i < total));
@@ -108,17 +114,17 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
     const fourth = pickFrom(firstTen.filter((i) => !picked.has(i)));
     if (fourth !== null) picked.add(fourth);
     return picked;
-  }, [matches, selectedOffset]);
+  }, [sortedMatches, selectedOffset]);
 
   // Индекс первой замыленной карточки — на ней показываем подпись
   // "Sign In to see more..." (для авторизованных таких карточек нет).
   const firstLockedIndex = useMemo(() => {
     if (user) return -1;
-    for (let i = 0; i < matches.length; i += 1) {
+    for (let i = 0; i < sortedMatches.length; i += 1) {
       if (!freeMatchIndexes.has(i)) return i;
     }
     return -1;
-  }, [user, matches, freeMatchIndexes]);
+  }, [user, sortedMatches, freeMatchIndexes]);
 
   return (
     <>
@@ -195,14 +201,14 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
 
         {!loading && !error && (
           <>
-            {matches.length === 0 ? (
+            {sortedMatches.length === 0 ? (
               <div className="state-box">
                 <i className="fa-regular fa-calendar-xmark"></i>
                 <p>No matches for this day yet.</p>
               </div>
             ) : (
               <div className="grid">
-                {matches.map((m, i) => (
+                {sortedMatches.map((m, i) => (
                   <MatchCard
                     match={m}
                     filterType={filterType}
