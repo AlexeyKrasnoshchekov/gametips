@@ -20,10 +20,11 @@ export default function AboutPage() {
         GameTips is a football predictions and betting tips website. Every day
         we aggregate forecasts from multiple trusted sources, combine them with
         bookmaker odds, implied probabilities and edge analysis, and publish
-        clear, data-driven tips for the day&rsquo;s matches.
+        clear data-driven football match analytics and AI football predictions
+        for the day&rsquo;s matches.
       </p>
 
-      <h2>How our predictions work</h2>
+      <h2>How our football predictions work</h2>
       <ul>
         <li>
           <strong>Aggregation.</strong> For each match we collect predictions

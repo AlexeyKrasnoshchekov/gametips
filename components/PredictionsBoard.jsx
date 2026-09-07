@@ -132,10 +132,12 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
       />
 
       <section className="hero">
-        <h1>Predictions and tips for {heroDay} matches</h1>
+        <h1>Football predictions and betting tips for {heroDay} matches</h1>
         <p>
-          Data-driven odds, implied probabilities, edge analysis and correct
-          score forecasts aggregated from multiple trusted sources.
+          Free football betting tips powered by AI football predictions —
+          football match analytics built on data-driven odds, implied
+          probabilities, edge analysis and correct score forecasts aggregated
+          from multiple trusted sources.
         </p>
       </section>
 

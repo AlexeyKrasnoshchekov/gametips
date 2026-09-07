@@ -19,8 +19,8 @@ export default function BlogPage() {
     <main className="privacy-page blog-page">
       <h1>Blog</h1>
       <p className="legal-updated">
-        Practical guides to football betting markets — written to help you read
-        our predictions boards like an analyst.
+        Practical guides to football betting tips and markets — written to help
+        you read our football predictions boards like an analyst.
       </p>
 
       <div className="blog-list">

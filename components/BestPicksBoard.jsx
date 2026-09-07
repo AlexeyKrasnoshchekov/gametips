@@ -247,12 +247,13 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
       <section className="hero">
         <h1>
           {selectedOffset === 0
-            ? 'Best picks for today'
-            : `Best picks for ${getDayLabel(selectedOffset)}`}
+            ? 'Best picks and betting tips today'
+            : `Best picks and betting tips for ${getDayLabel(selectedOffset)}`}
         </h1>
         <p>
-          The strongest single picks of the day across every market — overall,
-          totals, match result and BTTS — with a confidence score for each tip.
+          The strongest single football match predictions of the day across
+          every market — overall, totals, match result and BTTS — each with a
+          confidence score and bookmaker odds insight.
         </p>
       </section>
 

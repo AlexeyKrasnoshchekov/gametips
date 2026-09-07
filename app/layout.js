@@ -6,7 +6,9 @@ import { SITE_URL } from '@/lib/site';
 export const metadata = {
   title: "GameTips — Today's Football Predictions",
   description:
-    "Fresh betting tips for today's matches from the GameTips analyst team.",
+    'Daily betting tips and AI-powered predictions for many football matches. Get free match analysis, odds insights and expert betting advice at GameTips.bet.',
+  keywords:
+    'football betting tips, football predictions, AI football predictions, betting tips today, football match predictions, football match analytics, free football betting tips, daily football predictions, AI football betting predictions',
   metadataBase: new URL(SITE_URL),
   icons: {
     icon: [
@@ -20,7 +22,7 @@ export const metadata = {
   openGraph: {
     title: "GameTips — Today's Football Predictions",
     description:
-      "Fresh betting tips for today's matches from the GameTips analyst team.",
+      'Daily betting tips and AI-powered predictions for many football matches. Get free match analysis, odds insights and expert betting advice at GameTips.bet.',
     type: 'website',
   },
 };
@@ -32,7 +34,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ru">
+    <html lang="en">
       <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css"
