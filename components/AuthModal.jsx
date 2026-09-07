@@ -213,7 +213,7 @@ export default function AuthModal({ open, onClose, notice, onAuthenticated }) {
           <span>or with email</span>
         </div>
 
-        <form className="auth-form" onSubmit={submit}>
+        <form className="auth-form" onSubmit={submit} netlify>
           {mode === 'register' && (
             <label className="auth-field">
               <span>Name</span>
