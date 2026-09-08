@@ -5,7 +5,7 @@
 import { GoogleAnalytics } from '@next/third-parties/google';
 import CookieConsent from './CookieConsent';
 
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+const GA_ID = process.env.GA_ID;
 
 export default function GoogleAnalyticsProvider() {
   if (!GA_ID) return null;
