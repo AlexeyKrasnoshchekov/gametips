@@ -1,4 +1,4 @@
-import { fetchTodayPicks, formatDateForApi } from '@/lib/api';
+import { fetchTodayBestPicks, formatDateForApi } from '@/lib/api';
 import BestPicksBoard from '@/components/BestPicksBoard';
 
 // Picks are refreshed daily via the dashboard JSON upload — always fresh.
@@ -16,7 +16,7 @@ export default async function BestPicksPage() {
 
   try {
     // Первый рендер — сегодняшние подборки (как Home рендерит сегодняшние матчи).
-    const data = await fetchTodayPicks(formatDateForApi(0));
+    const data = await fetchTodayBestPicks(formatDateForApi(0));
     picks = Array.isArray(data) ? data : [];
   } catch (err) {
     console.warn('[GameTips] Backend unavailable.', err);

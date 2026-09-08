@@ -1,58 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchTodayPicks, formatDateForApi, getDayLabel } from '@/lib/api';
+import { fetchTodayBestPicks, formatDateForApi, getDayLabel } from '@/lib/api';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
 import { useAuth } from './AuthContext';
 
 // ---------------------------------------------------------------------------
-// Разбор данных TodayPicks (коллекция заполняется загрузкой JSON в дашборде).
-// Ключ прогноза у каждого объекта свой: 'TodayOveralFirstPick',
-// 'TodayTotalOver25SecondPick', ... плюс служебные confidence / result / date.
+// Разбор данных TodayBestPicks (коллекция заполняется загрузкой JSON-файла
+// в дашборде). Один документ = один пик:
+//   { rank: 1, match: 'Bournemouth vs Lincoln', market: 'Home Win',
+//     confidence: 9.5, consensus: { win_sources: 8, total_sources: 34 },
+//     ai_primary: 'Primary pick: ...', ai_secondary: 'Secondary pick: ...',
+//     popular_scores: ['3-1', '2-0', '2-1'],
+//     generated_picks: 10, historical_matches_analyzed: 2043, date: '08.09.2026' }
 // ---------------------------------------------------------------------------
-
-const NON_PICK_KEYS = new Set([
-  '_id',
-  'confidence',
-  'result',
-  'date',
-  'BookmakerOdd',
-  'createdAt',
-  'updatedAt',
-  '__v',
-]);
-
-// Человекочитаемые названия категорий прогнозов (с пробелами).
-const GROUP_LABELS = {
-  Overal: 'Overall',
-  TotalOver25: 'Total Over 2.5',
-  TotalOver15: 'Total Over 1.5',
-  TotalUnder25: 'Total Under 2.5',
-  TotalUnder35: 'Total Under 3.5',
-  TotalHomeWin: 'Home Win',
-  TotalAwayWin: 'Away Win',
-  TotalBttsYes: 'Btts Yes',
-  // Без префикса Total — запасные метки на случай отличающихся ключей в базе.
-  HomeWin: 'Home Win',
-  AwayWin: 'Away Win',
-  BttsYes: 'Btts Yes',
-};
-
-// Порядок секций на странице (неизвестные группы — в конце, по алфавиту).
-const GROUP_ORDER = [
-  'Overal',
-  'TotalOver25',
-  'TotalOver15',
-  'TotalUnder25',
-  'TotalUnder35',
-  'TotalHomeWin',
-  'TotalAwayWin',
-  'TotalBttsYes',
-];
-
-const POSITION_LABELS = { First: '1st pick', Second: '2nd pick', Third: '3rd pick' };
-const POSITION_ORDER = { First: 1, Second: 2, Third: 3 };
 
 // Бесплатный лимит просмотра для неавторизованных — как на странице Home.
 const FREE_PREVIEW_LIMIT = 4;
@@ -61,102 +23,88 @@ const FREE_PREVIEW_LIMIT = 4;
 // (старые даты слева, Today последним).
 const dayOptions = [{ offset: 2 }, { offset: 1 }, { offset: 0 }];
 
-function parsePickKey(key) {
-  const m = /^Today(.+?)(First|Second|Third)Pick$/.exec(String(key || ''));
-  return m ? { group: m[1], position: m[2] } : null;
+// Человекочитаемые подписи известных ключей консенсуса (значение ключа —
+// сколько источников предсказали этот исход).
+const CONSENSUS_LABELS = {
+  win_sources: 'Win',
+  home_sources: 'Home',
+  draw_sources: 'Draw',
+  away_sources: 'Away',
+  btts_yes: 'BTTS yes',
+  btts_no: 'BTTS no',
+  over_sources: 'Over',
+  under_sources: 'Under',
+};
+
+// 'Primary pick: Bournemouth Win' -> 'Bournemouth Win'
+function stripAiPrefix(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/^primary\s+pick\s*:\s*/i, '')
+    .replace(/^secondary\s+pick\s*:\s*/i, '')
+    .trim();
 }
 
-// Из строки прогноза достаёт только пару команд «Home vs Away» и отбрасывает
-// пояснения после разделителя:
-//   'Копенгаген vs Нордшелланд — Тотал Больше 2.5 (...)' -> 'Копенгаген vs Нордшелланд'
-//   'Sassuolo vs Frosinone - Over 1.5 Goals'             -> 'Sassuolo vs Frosinone'
-// Дефис внутри названия (Санкт-Петербург) НЕ является разделителем — срабатывают
-// только сочетания с пробелами вокруг ( — / - / – / ( ).
-function teamsFromValue(raw) {
-  const s = String(raw || '').trim();
-  const m = /^(.*?)\s+vs\s+(.*)$/i.exec(s);
-  if (!m) return s;
-  let away = m[2].trim();
-  const cut = away.search(/[—–-]\s|\s[—–-]|\s\(|\(/);
-  if (cut !== -1) away = away.slice(0, cut).trim();
-  return `${m[1].trim()} vs ${away}`;
+// consensus -> 'Win 8 of 34 sources' / 'BTTS yes 11 · BTTS no 0 of 32 sources'
+function consensusText(consensus) {
+  if (!consensus || typeof consensus !== 'object') return '';
+  const total = Number(consensus.total_sources);
+  const parts = Object.entries(consensus)
+    .filter(
+      ([key, value]) =>
+        key !== 'total_sources' && Number.isFinite(Number(value)),
+    )
+    .map(
+      ([key, value]) =>
+        `${CONSENSUS_LABELS[key] || key.replace(/_/g, ' ')} ${value}`,
+    );
+  if (parts.length === 0 && !Number.isFinite(total)) return '';
+  const head = parts.join(' · ');
+  const tail = Number.isFinite(total) ? ` of ${total} sources` : '';
+  return `${head}${tail}`.trim();
 }
 
-// Убирает ВЕСЬ текст в круглых скобках (в т.ч. вложенные), схлопывает лишние
-// пробелы. Для раздела Overall пояснение сохраняется, а скобочные комментарии
-// («главный выбор дня…», «(BTTS Yes)»…) отбрасываются:
-//   'Копенгаген vs Нордшелланд — ТБ 1.5 (главный выбор дня, 9...)' -> 'Копенгаген vs Нордшелланд — ТБ 1.5'
-//   'Базель vs Сьон — Обе забьют (BTTS Yes) (11 из 12 источников)' -> 'Базель vs Сьон — Обе забьют'
-function stripParentheticals(raw) {
-  let s = String(raw || '').trim();
-  let prev = null;
-  while (prev !== s) {
-    prev = s;
-    s = s.replace(/\([^()]*\)/g, '').replace(/\s{2,}/g, ' ').trim();
-  }
-  return s;
+// 2043 -> '2,043' (без toLocaleString — чтобы SSR и гидрация совпадали байт в байт)
+function formatNumber(value) {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 function normalizePick(elem) {
   if (!elem || typeof elem !== 'object') return null;
-  const pickKey = Object.keys(elem).find((k) => !NON_PICK_KEYS.has(k));
-  if (!pickKey) return null;
-  const parsed = parsePickKey(pickKey);
-  if (!parsed) return null;
+  const rank = Number(elem.rank);
+  const match = String(elem.match ?? '').trim();
+  if (!Number.isFinite(rank) || !match) return null;
 
-  const value = String(elem[pickKey] ?? '').trim();
-  const odd = Number(elem.BookmakerOdd);
-  const bookmakerOdd = Number.isFinite(odd) ? odd : null;
+  const confidenceRaw = Number(elem.confidence);
+  const confidence = Number.isFinite(confidenceRaw) ? confidenceRaw : 0;
+
+  const popularScores = (Array.isArray(elem.popular_scores)
+    ? elem.popular_scores
+    : []
+  )
+    .map((score) => String(score ?? '').trim())
+    .filter(Boolean);
 
   return {
-    key: pickKey,
-    group: parsed.group,
-    position: parsed.position,
-    value,
-    teams: teamsFromValue(value),
-    // В разделе Overall оставляем пояснение (без текста в скобках),
-    // в остальных разделах — только пару команд «Home vs Away».
-    display:
-      parsed.group === 'Overal'
-        ? stripParentheticals(value)
-        : teamsFromValue(value),
-    confidence: Number(elem.confidence) || 0,
-    bookmakerOdd,
-    result: String(elem.result ?? '').trim(),
+    key: `${String(elem.date || 'day')}-${rank}`,
+    rank,
+    match,
+    market: String(elem.market ?? '').trim(),
+    confidence,
+    consensus: consensusText(elem.consensus),
+    aiPrimary: stripAiPrefix(elem.ai_primary),
+    aiSecondary: stripAiPrefix(elem.ai_secondary),
+    popularScores,
     date: String(elem.date || ''),
   };
 }
 
+// Пики идут по rank (сервер тоже сортирует, но не полагаемся на это).
 function normalizePicks(list) {
   return (Array.isArray(list) ? list : [])
     .map(normalizePick)
-    .filter(Boolean);
-}
-
-// Группировка по категориям: секции в порядке GROUP_ORDER, внутри — 1st/2nd/3rd.
-function groupPicks(picks) {
-  const byGroup = new Map();
-  for (const pick of picks) {
-    if (!byGroup.has(pick.group)) byGroup.set(pick.group, []);
-    byGroup.get(pick.group).push(pick);
-  }
-  return [...byGroup.entries()]
-    .map(([group, items]) => ({
-      group,
-      label: GROUP_LABELS[group] || group,
-      picks: items.sort(
-        (a, b) =>
-          (POSITION_ORDER[a.position] || 9) - (POSITION_ORDER[b.position] || 9),
-      ),
-    }))
-    .sort((a, b) => {
-      const ia = GROUP_ORDER.indexOf(a.group);
-      const ib = GROUP_ORDER.indexOf(b.group);
-      if (ia !== -1 && ib !== -1) return ia - ib;
-      if (ia !== -1) return -1;
-      if (ib !== -1) return 1;
-      return a.group.localeCompare(b.group);
-    });
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank);
 }
 
 export default function BestPicksBoard({ initialPicks, initialError }) {
@@ -176,7 +124,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
     (offset = selectedOffset) => {
       setLoading(true);
       setError(null);
-      fetchTodayPicks(formatDateForApi(offset))
+      fetchTodayBestPicks(formatDateForApi(offset))
         .then((data) => setPicks(Array.isArray(data) ? data : []))
         .catch((err) => {
           console.warn('[GameTips] Backend unavailable.', err);
@@ -205,33 +153,46 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
   // В state всегда сырые документы API (и из SSR-пропсов, и из refresh);
   // нормализация — единая точка здесь, чтобы SSR и клиент вели себя одинаково.
   const normalizedPicks = useMemo(() => normalizePicks(picks), [picks]);
-  const sections = useMemo(() => groupPicks(normalizedPicks), [normalizedPicks]);
+
+  // Метаданные файла (generated_picks / historical_matches_analyzed) сервер
+  // кладёт в каждый документ — берём их из первого документа, где поля заполнены.
+  const meta = useMemo(() => {
+    for (const doc of Array.isArray(picks) ? picks : []) {
+      if (!doc || typeof doc !== 'object') continue;
+      const generated = Number(doc.generated_picks);
+      const historical = Number(doc.historical_matches_analyzed);
+      if (Number.isFinite(generated) || Number.isFinite(historical)) {
+        return {
+          generated: Number.isFinite(generated) ? generated : null,
+          historical: Number.isFinite(historical) ? historical : null,
+        };
+      }
+    }
+    return null;
+  }, [picks]);
 
   // Бесплатный просмотр для неавторизованных — как на странице Home:
-  // видно максимум 4 карточки, причём не более одной в каждой категории.
-  // Бесплатными становятся первые (1st pick) карточки первых категорий —
-  // выбор детерминированный, поэтому SSR и гидрация всегда совпадают.
+  // видно максимум 4 карточки, остальные замылены. Выбор детерминированный
+  // (первые пики по rank), поэтому SSR и гидрация всегда совпадают.
   const freePickKeys = useMemo(() => {
     if (user) return null; // авторизован — открыто всё
     const keys = new Set();
-    for (const section of sections) {
+    for (const pick of normalizedPicks) {
       if (keys.size >= FREE_PREVIEW_LIMIT) break;
-      if (section.picks.length > 0) keys.add(section.picks[0].key);
+      keys.add(pick.key);
     }
     return keys;
-  }, [user, sections]);
+  }, [user, normalizedPicks]);
 
   // Ключ первой замыленной карточки — на ней показываем подсказку
   // "Sign In to see more..." (для авторизованных подсказки нет).
   const firstLockedKey = useMemo(() => {
     if (user || !freePickKeys) return null;
-    for (const section of sections) {
-      for (const pick of section.picks) {
-        if (!freePickKeys.has(pick.key)) return pick.key;
-      }
+    for (const pick of normalizedPicks) {
+      if (!freePickKeys.has(pick.key)) return pick.key;
     }
     return null;
-  }, [user, sections, freePickKeys]);
+  }, [user, normalizedPicks, freePickKeys]);
 
   return (
     <>
@@ -251,9 +212,15 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
             : `Best picks and betting tips for ${getDayLabel(selectedOffset)}`}
         </h1>
         <p>
-          The strongest single football match predictions of the day across
-          every market — overall, totals, match result and BTTS — each with a
-          confidence score and bookmaker odds insight.
+          {meta
+            ? `${
+                meta.generated ?? normalizedPicks.length
+              } top picks generated from ${
+                meta.historical !== null
+                  ? `${formatNumber(meta.historical)} `
+                  : ''
+              }historical matches — ranked by confidence, with AI picks, source consensus and the most probable scores.`
+            : 'The strongest single football predictions of the day, ranked by confidence — with AI picks, source consensus and the most probable scores.'}
         </p>
       </section>
 
@@ -302,38 +269,42 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
           </div>
         )}
 
-        {!loading && !error && sections.length === 0 && (
+        {!loading && !error && normalizedPicks.length === 0 && (
           <div className="state-box">
             <i className="fa-regular fa-calendar-xmark"></i>
             <p>No best picks published yet. Please check back later.</p>
           </div>
         )}
 
-        {!loading &&
-          !error &&
-          sections.map((section) => (
-            <section className="picks-section" key={section.group}>
-              <h2 className="picks-cat">
-                <i className="fa-solid fa-bullseye"></i> {section.label}
-              </h2>
-              <div className="picks-grid">
-                {section.picks.map((pick) => {
-                  const locked =
-                    !user && freePickKeys && !freePickKeys.has(pick.key);
-                  return (
+        {!loading && !error && normalizedPicks.length > 0 && (
+          <section className="picks-section">
+            <h2 className="picks-cat">
+              <i className="fa-solid fa-bullseye"></i>{' '}
+              {selectedOffset === 0
+                ? "Today's top picks"
+                : `Top picks — ${getDayLabel(selectedOffset)}`}
+            </h2>
+            <div className="picks-grid">
+              {normalizedPicks.map((pick) => {
+                const locked =
+                  !user && freePickKeys && !freePickKeys.has(pick.key);
+                // confidence приходит по шкале 0–10 (например 9.5)
+                const confidencePct = Math.max(
+                  0,
+                  Math.min(100, pick.confidence * 10),
+                );
+                return (
                   <article
                     className={`pick-card ${locked ? 'pick-card-locked' : ''}`}
                     key={pick.key}
                   >
                     <div className="pick-card-head">
-                      <span className="pick-position">
-                        {POSITION_LABELS[pick.position] || pick.position}
-                      </span>
-                      <span className="pick-odd" title="Bookmaker odd">
-                        {pick.bookmakerOdd !== null ? pick.bookmakerOdd : '—'}
+                      <span className="pick-position">#{pick.rank} pick</span>
+                      <span className="pick-market" title="Market">
+                        {pick.market || '—'}
                       </span>
                     </div>
-                    <p className="pick-value">{pick.display}</p>
+                    <p className="pick-value">{pick.match}</p>
                     {locked && pick.key === firstLockedKey && (
                       <button
                         type="button"
@@ -345,11 +316,45 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                         more...
                       </button>
                     )}
+                    <div className="pick-meta">
+                      {pick.consensus && (
+                        <div className="pick-consensus">
+                          <i className="fa-solid fa-users"></i>
+                          <span>{pick.consensus}</span>
+                        </div>
+                      )}
+                      {pick.aiPrimary && (
+                        <div className="pick-ai">
+                          <span className="pick-ai-label">AI pick</span>
+                          <span className="pick-ai-value">{pick.aiPrimary}</span>
+                        </div>
+                      )}
+                      {pick.aiSecondary && (
+                        <div className="pick-ai">
+                          <span className="pick-ai-label">Also considered</span>
+                          <span className="pick-ai-value">
+                            {pick.aiSecondary}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {pick.popularScores.length > 0 && (
+                      <div className="pick-scores">
+                        <span className="pick-scores-label">Popular scores</span>
+                        <div className="pick-scores-list">
+                          {pick.popularScores.map((score) => (
+                            <span className="pick-score" key={score}>
+                              {score}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="pick-confidence">
                       <div className="pick-confidence-top">
                         <span>Confidence</span>
                         <span className="pick-confidence-num">
-                          {pick.confidence}%
+                          {pick.confidence}/10
                         </span>
                       </div>
                       <div
@@ -357,21 +362,17 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                         role="progressbar"
                         aria-valuenow={pick.confidence}
                         aria-valuemin={0}
-                        aria-valuemax={100}
+                        aria-valuemax={10}
                       >
-                        <span
-                          style={{
-                            width: `${Math.max(0, Math.min(100, pick.confidence))}%`,
-                          }}
-                        />
+                        <span style={{ width: `${confidencePct}%` }} />
                       </div>
                     </div>
                   </article>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
       <SiteFooter />

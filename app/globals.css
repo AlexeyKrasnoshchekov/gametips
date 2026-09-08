@@ -1097,8 +1097,10 @@ a.brand{text-decoration:none;}
     gap:12px;
 }
 /* Замыленные карточки для неавторизованных (аналог .card-locked на Home):
-   шапка карточки (позиция и коэффициент) видима, содержимое размыто. */
+   шапка карточки (позиция и маркет) видима, содержимое размыто. */
 .pick-card.pick-card-locked .pick-value,
+.pick-card.pick-card-locked .pick-meta,
+.pick-card.pick-card-locked .pick-scores,
 .pick-card.pick-card-locked .pick-confidence{
     filter:blur(7px);
     pointer-events:none;
@@ -1156,6 +1158,75 @@ a.brand{text-decoration:none;}
     color:var(--danger);
     border-color:rgba(224,116,95,.4);
     background:rgba(224,116,95,.08);
+}
+.pick-market{
+    display:inline-flex;
+    align-items:center;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.2px;
+    padding:3px 10px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    white-space:nowrap;
+}
+.pick-meta{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+.pick-consensus{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    color:var(--text-dim);
+}
+.pick-consensus i{color:var(--accent);font-size:12px;}
+.pick-ai{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+}
+.pick-ai-label{
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--text-dim);
+}
+.pick-ai-value{
+    font-size:14px;
+    font-weight:600;
+    line-height:1.4;
+}
+.pick-scores{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+.pick-scores-label{
+    font-size:10.5px;
+    font-weight:600;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--text-dim);
+}
+.pick-scores-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+}
+.pick-score{
+    display:inline-flex;
+    align-items:center;
+    font-size:12.5px;
+    font-weight:700;
+    padding:2px 10px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--bg-soft);
 }
 .pick-value{
     font-size:15.5px;
