@@ -78,7 +78,12 @@ export default function PredictionsBoard({ initialMatches, initialError }) {
   // Выбор сидируется датой (mulberry32 PRNG), поэтому серверный рендер и
   // гидрация всегда совпадают (без мерцания/hydration mismatch), а бесплатные
   // карточки каждый день другие. Для авторизованных всё открыто.
+  // Если фильтр Даты не Today — показываем все карточки.
   const freeMatchIndexes = useMemo(() => {
+    if (selectedOffset !== 0) {
+      // Не Today — все карточки видимы
+      return new Set(Array.from({ length: sortedMatches.length }, (_, i) => i));
+    }
     const seedStr = formatDateForApi(selectedOffset); // 'dd.mm.yyyy'
     let seed = 0;
     for (let i = 0; i < seedStr.length; i += 1) {

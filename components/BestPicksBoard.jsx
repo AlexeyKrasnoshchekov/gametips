@@ -141,15 +141,17 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
   // Бесплатный просмотр для неавторизованных — как на странице Home:
   // видно максимум 4 карточки, остальные замылены. Выбор детерминированный
   // (первые пики по rank), поэтому SSR и гидрация всегда совпадают.
+  // Если фильтр Даты не Today — показываем все карточки.
   const freePickKeys = useMemo(() => {
     if (user) return null; // авторизован — открыто всё
+    if (selectedOffset !== 0) return null; // не Today — открыто всё
     const keys = new Set();
     for (const pick of normalizedPicks) {
       if (keys.size >= FREE_PREVIEW_LIMIT) break;
       keys.add(pick.key);
     }
     return keys;
-  }, [user, normalizedPicks]);
+  }, [user, normalizedPicks, selectedOffset]);
 
   // Ключ первой замыленной карточки — на ней показываем подсказку
   // "Sign In to see more..." (для авторизованных подсказки нет).
