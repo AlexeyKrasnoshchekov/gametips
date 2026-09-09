@@ -10,8 +10,7 @@ import { useAuth } from './AuthContext';
 // Разбор данных TodayBestPicks (коллекция заполняется загрузкой JSON-файла
 // в дашборде). Один документ = один пик:
 //   { rank: 1, match: 'Bournemouth vs Lincoln', market: 'Home Win',
-//     confidence: 9.5, consensus: { win_sources: 8, total_sources: 34 },
-//     ai_primary: 'Primary pick: ...', ai_secondary: 'Secondary pick: ...',
+//     confidence: 9.5, odds: 1.57, EV: 0.193, stake: 10,
 //     popular_scores: ['3-1', '2-0', '2-1'],
 //     generated_picks: 10, historical_matches_analyzed: 2043, date: '08.09.2026' }
 // ---------------------------------------------------------------------------
@@ -22,47 +21,6 @@ const FREE_PREVIEW_LIMIT = 4;
 // Дневные фильтры — тот же состав, порядок и подписи, что на странице Home
 // (старые даты слева, Today последним).
 const dayOptions = [{ offset: 2 }, { offset: 1 }, { offset: 0 }];
-
-// Человекочитаемые подписи известных ключей консенсуса (значение ключа —
-// сколько источников предсказали этот исход).
-const CONSENSUS_LABELS = {
-  win_sources: 'Win',
-  home_sources: 'Home',
-  draw_sources: 'Draw',
-  away_sources: 'Away',
-  btts_yes: 'BTTS yes',
-  btts_no: 'BTTS no',
-  over_sources: 'Over',
-  under_sources: 'Under',
-};
-
-// 'Primary pick: Bournemouth Win' -> 'Bournemouth Win'
-function stripAiPrefix(raw) {
-  return String(raw || '')
-    .trim()
-    .replace(/^primary\s+pick\s*:\s*/i, '')
-    .replace(/^secondary\s+pick\s*:\s*/i, '')
-    .trim();
-}
-
-// consensus -> 'Win 8 of 34 sources' / 'BTTS yes 11 · BTTS no 0 of 32 sources'
-function consensusText(consensus) {
-  if (!consensus || typeof consensus !== 'object') return '';
-  const total = Number(consensus.total_sources);
-  const parts = Object.entries(consensus)
-    .filter(
-      ([key, value]) =>
-        key !== 'total_sources' && Number.isFinite(Number(value)),
-    )
-    .map(
-      ([key, value]) =>
-        `${CONSENSUS_LABELS[key] || key.replace(/_/g, ' ')} ${value}`,
-    );
-  if (parts.length === 0 && !Number.isFinite(total)) return '';
-  const head = parts.join(' · ');
-  const tail = Number.isFinite(total) ? ` of ${total} sources` : '';
-  return `${head}${tail}`.trim();
-}
 
 // 2043 -> '2,043' (без toLocaleString — чтобы SSR и гидрация совпадали байт в байт)
 function formatNumber(value) {
@@ -78,6 +36,15 @@ function normalizePick(elem) {
   const confidenceRaw = Number(elem.confidence);
   const confidence = Number.isFinite(confidenceRaw) ? confidenceRaw : 0;
 
+  const oddsRaw = Number(elem.odds);
+  const odds = Number.isFinite(oddsRaw) ? oddsRaw : null;
+
+  const evRaw = Number(elem.EV);
+  const ev = Number.isFinite(evRaw) ? evRaw : null;
+
+  const stakeRaw = Number(elem.stake);
+  const stake = Number.isFinite(stakeRaw) ? stakeRaw : null;
+
   const popularScores = (Array.isArray(elem.popular_scores)
     ? elem.popular_scores
     : []
@@ -91,9 +58,9 @@ function normalizePick(elem) {
     match,
     market: String(elem.market ?? '').trim(),
     confidence,
-    consensus: consensusText(elem.consensus),
-    aiPrimary: stripAiPrefix(elem.ai_primary),
-    aiSecondary: stripAiPrefix(elem.ai_secondary),
+    odds,
+    ev,
+    stake,
     popularScores,
     date: String(elem.date || ''),
   };
@@ -317,24 +284,24 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                       </button>
                     )}
                     <div className="pick-meta">
-                      {pick.consensus && (
-                        <div className="pick-consensus">
-                          <i className="fa-solid fa-users"></i>
-                          <span>{pick.consensus}</span>
+                      {pick.odds && (
+                        <div className="pick-odds">
+                          <span className="pick-odds-label">Odds</span>
+                          <span className="pick-odds-value">{pick.odds.toFixed(2)}</span>
                         </div>
                       )}
-                      {pick.aiPrimary && (
-                        <div className="pick-ai">
-                          <span className="pick-ai-label">AI pick</span>
-                          <span className="pick-ai-value">{pick.aiPrimary}</span>
-                        </div>
-                      )}
-                      {pick.aiSecondary && (
-                        <div className="pick-ai">
-                          <span className="pick-ai-label">Also considered</span>
-                          <span className="pick-ai-value">
-                            {pick.aiSecondary}
+                      {pick.ev !== null && pick.ev !== undefined && (
+                        <div className="pick-ev">
+                          <span className="pick-ev-label">EV</span>
+                          <span className={`pick-ev-value ${pick.ev > 0 ? 'positive' : pick.ev < 0 ? 'negative' : ''}`}>
+                            {pick.ev > 0 ? '+' : ''}{pick.ev.toFixed(3)}
                           </span>
+                        </div>
+                      )}
+                      {pick.stake !== null && pick.stake !== undefined && (
+                        <div className="pick-stake">
+                          <span className="pick-stake-label">Stake</span>
+                          <span className="pick-stake-value">{pick.stake}%</span>
                         </div>
                       )}
                     </div>

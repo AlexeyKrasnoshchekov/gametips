@@ -1176,30 +1176,35 @@ a.brand{text-decoration:none;}
     flex-direction:column;
     gap:8px;
 }
-.pick-consensus{
+.pick-odds,
+.pick-ev,
+.pick-stake{
     display:flex;
     align-items:center;
-    gap:8px;
-    font-size:13px;
-    color:var(--text-dim);
+    justify-content:space-between;
+    font-size:14px;
 }
-.pick-consensus i{color:var(--accent);font-size:12px;}
-.pick-ai{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-}
-.pick-ai-label{
+.pick-odds-label,
+.pick-ev-label,
+.pick-stake-label{
     font-size:10.5px;
     font-weight:600;
     letter-spacing:.5px;
     text-transform:uppercase;
     color:var(--text-dim);
 }
-.pick-ai-value{
+.pick-odds-value,
+.pick-ev-value,
+.pick-stake-value{
     font-size:14px;
     font-weight:600;
     line-height:1.4;
+}
+.pick-ev-value.positive{
+    color:var(--success, #22c55e);
+}
+.pick-ev-value.negative{
+    color:var(--danger, #ef4444);
 }
 .pick-scores{
     display:flex;
