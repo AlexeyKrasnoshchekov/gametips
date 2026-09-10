@@ -97,11 +97,15 @@ export default function MatchCard({
   }, [aiOpen]);
 
   const stats = [];
-  if (match.over25Odd) {
+  // Show Over 2.5 whenever aggregated data exists (historical weight and/or
+  // source count). Bookmaker odds are optional: the odds API sometimes has no
+  // price for a fixture (quota, missing market), so fall back to "N/A" instead
+  // of hiding the section entirely.
+  if (match.over25Odd || match.probWeightO25 !== undefined) {
     stats.push({
       key: 'Over 2.5',
       type: 'Over 2.5',
-      odd: match.over25Odd,
+      odd: match.over25Odd || 'N/A',
       imp: match.over25ImpProb,
       weight: match.probWeightO25,
       res: normalizeRes(match.over25Res),
@@ -110,11 +114,11 @@ export default function MatchCard({
       icon: 'fa-arrow-up',
     });
   }
-  if (match.over15Odd) {
+  if (match.over15Odd || match.probWeightOverO15 !== undefined) {
     stats.push({
       key: 'Over 1.5',
       type: 'Over 1.5',
-      odd: match.over15Odd,
+      odd: match.over15Odd || 'N/A',
       imp: match.over15ImpProb,
       weight: match.probWeightOverO15,
       res: normalizeRes(match.over15Res),
@@ -346,14 +350,14 @@ export default function MatchCard({
             <div className="prob-bar-track">
               <div
                 className="prob-bar-fill"
-                style={{ width: `${Math.round(s.weight * 100)}%` }}
+                style={{ width: `${Math.round((s.weight || 0) * 100)}%` }}
               ></div>
             </div>
             <div className="stat-meta">
               <span>Implied {s.imp ? `${s.imp}%` : 'N/A'}</span>
             </div>
             <div className="stat-meta">
-              <span>Historically {Math.round(s.weight * 100)}%</span>
+              <span>Historically {Math.round((s.weight || 0) * 100)}%</span>
               <span className="info-icon">
                 <i className="fa-solid fa-info"></i>
                 <span className="info-tooltip">
