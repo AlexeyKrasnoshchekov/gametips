@@ -127,11 +127,19 @@ export default function MatchCard({
       icon: 'fa-arrow-trend-up',
     });
   }
-  if (match.under25Odd) {
+  // Show Under 2.5 whenever aggregated data exists (historical weight and/or
+  // source count). Bookmaker odds are optional: on some days the odds feed has
+  // no Under 2.5 price, so fall back to "N/A" instead of hiding the section
+  // (the same convention used by the Over 2.5 / Over 1.5 blocks above).
+  if (
+    match.under25Odd ||
+    match.probWeightUnder25 !== undefined ||
+    (match.under25 && match.under25.underCount)
+  ) {
     stats.push({
       key: 'Under 2.5',
       type: 'Under 2.5',
-      odd: match.under25Odd,
+      odd: match.under25Odd || 'N/A',
       imp: match.under25ImpProb,
       weight: match.probWeightUnder25,
       res: normalizeRes(match.under25Res),
@@ -140,10 +148,15 @@ export default function MatchCard({
       icon: 'fa-arrow-down',
     });
   }
-  if (!match.under25Odd && !match.over15Odd && match.probWeightUnder35 !== undefined) {
+  // Show Under 3.5 whenever aggregated data exists (model weight and/or odds),
+  // independently of Under 2.5 — same as the Over 1.5 block above. The API has
+  // no per-match source aggregation for this market, so the sources count is
+  // omitted (like Home DNB / Away DNB) and the stat is exempt from the
+  // MIN_SOURCES consensus filter below.
+  if (match.under35Odd || match.probWeightUnder35 !== undefined) {
     stats.push({
       key: 'Under 3.5',
-      type: 'Under 2.5',
+      type: 'Under 3.5',
       odd: match.under35Odd || 'N/A',
       imp: match.under35ImpProb || null,
       weight: match.probWeightUnder35,
@@ -271,9 +284,13 @@ export default function MatchCard({
   );
 
   // Hide sections backed by fewer than MIN_SOURCES agreeing sources.
+  // Under 3.5 has no source aggregation on the API — it is a pure model
+  // probability, so it is exempt from the source-count threshold.
   const MIN_SOURCES = 3;
   const significantStats = sortedStats.filter(
-    (s) => sourceCount(s.count) >= MIN_SOURCES,
+    (s) =>
+      sourceCount(s.count) >= MIN_SOURCES ||
+      (s.type === 'Under 3.5' && s.weight !== undefined),
   );
 
   const visibleStats =

@@ -3,6 +3,7 @@ export const filterOptions = [
   { label: 'Over 2.5', type: 'Over 2.5' },
   { label: 'Over 1.5', type: 'Over 1.5' },
   { label: 'Under 2.5', type: 'Under 2.5' },
+  { label: 'Under 3.5', type: 'Under 3.5' },
   { label: 'BTTS', type: 'BTTS' },
   { label: 'Home Win', type: 'Home Win' },
   { label: 'Away Win', type: 'Away Win' },
