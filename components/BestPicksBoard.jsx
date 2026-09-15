@@ -11,16 +11,17 @@ import { useAuth } from './AuthContext';
 // GET /selectBestPicks/saved). Один документ = один пик:
 //   { pickType, confidence (hitRate %), base (sample), sourceCount, threshold,
 //     isCSEnhanced, csAvgGoals, isAIConfirmed, aiConfirmedConfidence,
-//     aiConfirmedBase, homeTeam, awayTeam, league, date, matchId, ... }
-// Отображение: фиксированные категории рынков, в каждой — не более 5 лучших
-// матчей. Отбор топ-5 внутри категории (по убыванию):
-//   1) эффективный confidence: у AI-подтверждённых пиков — aiConfirmedConfidence,
-//      у остальных — consensus confidence (hitRate из бэктеста);
-//   2) при равном confidence — эффективный base (у AI-пиков — aiConfirmedBase,
-//      у остальных — base);
-//   3) для тоталов (Over/Under) при равных confidence и base — больше
-//      csAvgGoals (пики без CS-оценки проигрывают пикам с оценкой);
-//   4) далее — детерминированный порядок (sourceCount, имена команд).
+//     aiConfirmedBase, homeTeam, awayTeam, league, date, matchId, ...
+//     isTopPick, topPickRank }
+// Отбор лучших выполняется НА СЕРВЕРЕ (markTopPicks в
+// gametips-server/routes/selectBestPicks): в каждой категории (Home Win,
+// Home DNB, Away Win, Away DNB, BTTS Yes, Over 1.5, Over 2.5, Under 2.5,
+// Under 3.5) отмечены топ-5..10 пиков — isTopPick: true + topPickRank 1..10.
+// Правила ранжирования на сервере: эффективный confidence (AI confidence у
+// подтверждённых) -> эффективный base -> для тоталов csAvgGoals.
+// Клиент ничего не отбирает сам: только фильтрует отмеченные пики по
+// категориям и сортирует их по topPickRank. Эффективные confidence/base
+// (effectiveConfidence / effectiveBase) остаются только для отображения карточек.
 // ---------------------------------------------------------------------------
 
 // Бесплатный лимит просмотра для неавторизованных — как на странице Home.
@@ -45,13 +46,15 @@ const CATEGORIES = [
 
 const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.key, c.label]));
 
-// pickType -> категория (включая CS-варианты тоталов из старых данных).
+// pickType -> категория (включая CS-варианты тоталов и BTTS Yes — как на
+// сервере; bttsNo / bttsNo_CS в категориях Best Picks не состоят).
 const PICK_CATEGORY = {
   homeWin: 'homeWin',
   homeDNB: 'homeDNB',
   awayWin: 'awayWin',
   awayDNB: 'awayDNB',
   bttsYes: 'bttsYes',
+  bttsYes_CS: 'bttsYes',
   over15: 'over15',
   over15_CS: 'over15',
   over25: 'over25',
@@ -60,9 +63,6 @@ const PICK_CATEGORY = {
   under25_CS: 'under25',
   under35: 'under35',
 };
-
-// Категории тоталов — при равенстве confidence и base добиваем по csAvgGoals.
-const TOTALS_CATEGORIES = new Set(['over15', 'over25', 'under25', 'under35']);
 
 // Эффективный confidence пика: у AI-подтверждённых — процент по бэктесту
 // подтверждения, у остальных — консенсусный hitRate.
@@ -124,6 +124,14 @@ function normalizePick(elem, index) {
     aiNote: String(elem.aiNote ?? '').trim() || null,
     aiPrimaryPick: String(elem.aiPrimaryPick ?? '').trim() || null,
     aiSecondaryPick: String(elem.aiSecondaryPick ?? '').trim() || null,
+    // Серверная маркировка топ-пиков категории (markTopPicks).
+    isTopPick: elem.isTopPick === true,
+    topPickRank:
+      elem.topPickRank === null || elem.topPickRank === undefined
+        ? null
+        : Number.isFinite(Number(elem.topPickRank))
+          ? Number(elem.topPickRank)
+          : null,
   };
 }
 
@@ -137,44 +145,14 @@ function marketLabel(pick) {
   return pick.isCSEnhanced ? `${label} · CS` : label;
 }
 
-// Топ-5 пиков категории: сортировка по правилам из шапки файла + один матч
-// в категории не более одного раза (страховка от дублей в старых данных).
-function topPicksForCategory(picks, categoryKey) {
-  const isTotals = TOTALS_CATEGORIES.has(categoryKey);
-
-  const sorted = [...picks].sort((a, b) => {
-    // 1) эффективный confidence (AI confidence у подтверждённых, иначе hitRate);
-    const confDiff = effectiveConfidence(b) - effectiveConfidence(a);
-    if (confDiff) return confDiff;
-    // 2) при равенстве — больший base;
-    const baseDiff = effectiveBase(b) - effectiveBase(a);
-    if (baseDiff) return baseDiff;
-    // 3) тоталы: при равенстве confidence и base — больший CS avg goals;
-    if (isTotals) {
-      const aCS = a.csAvgGoals === null ? -Infinity : a.csAvgGoals;
-      const bCS = b.csAvgGoals === null ? -Infinity : b.csAvgGoals;
-      if (aCS !== bCS) return bCS - aCS;
-    }
-    // 4) детерминированный добив, чтобы SSR и гидрация совпадали.
-    const srcDiff = (b.sourceCount || 0) - (a.sourceCount || 0);
-    if (srcDiff) return srcDiff;
-    return (
-      a.homeTeam.localeCompare(b.homeTeam) ||
-      a.awayTeam.localeCompare(b.awayTeam) ||
-      a.pickType.localeCompare(b.pickType)
-    );
-  });
-
-  const seenMatches = new Set();
-  const result = [];
-  for (const pick of sorted) {
-    const matchKey = `${pick.homeTeam}|${pick.awayTeam}`;
-    if (seenMatches.has(matchKey)) continue;
-    seenMatches.add(matchKey);
-    result.push(pick);
-    if (result.length >= 5) break;
-  }
-  return result;
+// Топ-пики категории приходят уже отмеченными с сервера (isTopPick / topPickRank
+// выставляет markTopPicks в gametips-server перед сохранением в базу).
+// Клиент ничего не отбирает: фильтрует отмеченные и сортирует по рангу;
+// пики без серверной маркировки (старые данные) не показываются.
+function serverTopPicksForCategory(picks) {
+  return picks
+    .filter((pick) => pick.isTopPick)
+    .sort((a, b) => (a.topPickRank ?? 99) - (b.topPickRank ?? 99));
 }
 
 export default function BestPicksBoard({ initialPicks, initialError }) {
@@ -224,8 +202,9 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
   // чтобы SSR и клиент вели себя одинаково.
   const normalizedPicks = useMemo(() => normalizePicks(picks), [picks]);
 
-  // Категории в фиксированном порядке, внутри каждой — топ-5 матчей;
-  // пустые категории не выводим.
+  // Категории в фиксированном порядке; внутри каждой — только топ-пики,
+  // отмеченные сервером (isTopPick), в порядке серверных рангов.
+  // Пустые категории не выводим.
   const categories = useMemo(() => {
     const groups = new Map(CATEGORIES.map((cat) => [cat.key, []]));
     for (const pick of normalizedPicks) {
@@ -234,7 +213,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
     }
     return CATEGORIES.map((cat) => ({
       ...cat,
-      picks: topPicksForCategory(groups.get(cat.key) || [], cat.key),
+      picks: serverTopPicksForCategory(groups.get(cat.key) || []),
     })).filter((cat) => cat.picks.length > 0);
   }, [normalizedPicks]);
 
@@ -292,7 +271,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
         </h1>
         <p>
           {totalPicks > 0
-            ? `${totalPicks} top picks across ${categories.length} markets — crowd consensus ranked by backtested hit rate, with AI-confirmed selections highlighted. Up to 5 matches per market.`
+            ? `${totalPicks} top picks across ${categories.length} markets — crowd consensus ranked by backtested hit rate, with AI-confirmed selections highlighted. Up to 10 matches per market.`
             : 'The strongest football predictions of the day, grouped by market — crowd consensus ranked by backtested hit rate, with AI-confirmed selections highlighted.'}
         </p>
       </section>
@@ -370,7 +349,9 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                       key={pick.key}
                     >
                       <div className="pick-card-head">
-                        <span className="pick-position">#{idx + 1} pick</span>
+                        <span className="pick-position">
+                          #{pick.topPickRank ?? idx + 1} pick
+                        </span>
                         <span
                           className="pick-market"
                           title={pick.league || 'Market'}
