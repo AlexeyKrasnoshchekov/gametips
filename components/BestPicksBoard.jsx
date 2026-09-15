@@ -76,15 +76,21 @@ function effectiveConfidence(pick) {
 }
 
 // pickType -> поле коэффициента рынка в документе матча (как в gametips-dash,
-// колонка Pick Odd). Для Home DNB / Away DNB коэффициента в mc нет.
+// колонка Pick Odd). CS-варианты картятся на коэффициент своего рынка
+// (Over 1.5 CS — это тот же рынок Over 1.5). Для Home DNB / Away DNB
+// коэффициента в mc нет.
 const PICK_ODD_FIELD = {
   homeWin: 'homeWinOdd',
   awayWin: 'awayWinOdd',
   over15: 'over15Odd',
+  over15_CS: 'over15Odd',
   over25: 'over25Odd',
+  over25_CS: 'over25Odd',
   under25: 'under25Odd',
+  under25_CS: 'under25Odd',
   under35: 'under35Odd',
   bttsYes: 'bttsYesOdd',
+  bttsYes_CS: 'bttsYesOdd',
 };
 
 // Коэффициент рынка пика строкой ('1.55') или null, если недоступен.
@@ -153,10 +159,10 @@ function normalizePicks(list) {
   return (Array.isArray(list) ? list : []).map(normalizePick).filter(Boolean);
 }
 
-// Подпись рынка на карточке: категория + суффикс CS для correct-score пиков.
+// Подпись рынка на карточке (без упоминаний CS — CS-пики выводятся как
+// обычные пики своего рынка).
 function marketLabel(pick) {
-  const label = CATEGORY_LABEL[pick.category] || pick.pickType;
-  return pick.isCSEnhanced ? `${label} · CS` : label;
+  return CATEGORY_LABEL[pick.category] || pick.pickType;
 }
 
 // Топ-пики категории приходят уже отмеченными с сервера (isTopPick / topPickRank
@@ -445,7 +451,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                         )}
                         {pick.csAvgGoals !== null && (
                           <div className="pick-stake">
-                            <span className="pick-stake-label">CS avg goals</span>
+                            <span className="pick-stake-label">Avg goals</span>
                             <span className="pick-stake-value">
                               {pick.csAvgGoals.toFixed(2)}
                             </span>

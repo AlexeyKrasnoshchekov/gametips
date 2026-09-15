@@ -371,22 +371,6 @@ export default function MatchCard({
               ></div>
             </div>
             <div className="stat-meta">
-              <span>Implied {s.imp ? `${s.imp}%` : 'N/A'}</span>
-            </div>
-            <div className="stat-meta">
-              <span>Historically {Math.round((s.weight || 0) * 100)}%</span>
-              <span className="info-icon">
-                <i className="fa-solid fa-info"></i>
-                <span className="info-tooltip">
-                  <strong>Implied</strong> — probability calculated from the
-                  bookmaker&apos;s odds.
-                  <br />
-                  <strong>Historically</strong> — how often this outcome happened
-                  in similar past matches.
-                </span>
-              </span>
-            </div>
-            <div className="stat-meta">
               {s.count !== null && s.count !== undefined ? (
                 <span className="sources-count">
                   <i className="fa-solid fa-users"></i> {s.count} sources agree
