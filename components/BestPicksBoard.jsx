@@ -21,8 +21,9 @@ import { useAuth } from './AuthContext';
 // подтверждённых) -> эффективный base -> для тоталов csAvgGoals.
 // Клиент ничего не отбирает сам: только фильтрует отмеченные пики по
 // категориям и сортирует их по topPickRank. Фильтр по категории (чипы) —
-// чисто клиентский, поверх серверных маркеров. Эффективные confidence/base
-// (effectiveConfidence / effectiveBase) остаются только для отображения карточек.
+// чисто клиентский, поверх серверных маркеров. effectiveConfidence — только
+// для отображения карточек; odd берётся из полей кф матча (PICK_ODD_FIELD),
+// resultScore показывается в карточках прошедших дней (не Today).
 // ---------------------------------------------------------------------------
 
 // Бесплатный лимит просмотра для неавторизованных — как на странице Home.
@@ -74,17 +75,25 @@ function effectiveConfidence(pick) {
   return pick.confidence;
 }
 
-// Эффективный base — размер выборки, стоящей за показанным confidence.
-function effectiveBase(pick) {
-  if (pick.isAIConfirmed && Number.isFinite(pick.aiConfirmedBase)) {
-    return pick.aiConfirmedBase;
-  }
-  return pick.base;
-}
+// pickType -> поле коэффициента рынка в документе матча (как в gametips-dash,
+// колонка Pick Odd). Для Home DNB / Away DNB коэффициента в mc нет.
+const PICK_ODD_FIELD = {
+  homeWin: 'homeWinOdd',
+  awayWin: 'awayWinOdd',
+  over15: 'over15Odd',
+  over25: 'over25Odd',
+  under25: 'under25Odd',
+  under35: 'under35Odd',
+  bttsYes: 'bttsYesOdd',
+};
 
-// 2043 -> '2,043' (без toLocaleString — чтобы SSR и гидрация совпадали байт в байт)
-function formatNumber(value) {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+// Коэффициент рынка пика строкой ('1.55') или null, если недоступен.
+function pickOddValue(elem, pickType) {
+  const field = PICK_ODD_FIELD[pickType];
+  const raw = field ? elem[field] : null;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num.toFixed(2) : String(raw);
 }
 
 function normalizePick(elem, index) {
@@ -133,6 +142,10 @@ function normalizePick(elem, index) {
         : Number.isFinite(Number(elem.topPickRank))
           ? Number(elem.topPickRank)
           : null,
+    // Коэффициент рынка pickType (например, awayWin -> awayWinOdd: '1.55').
+    odd: pickOddValue(elem, pickType),
+    // Итог матча (заполняется сервисом для прошедших дней).
+    resultScore: String(elem.resultScore ?? '').trim() || null,
   };
 }
 
@@ -388,7 +401,6 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                   // confidence — hitRate в процентах (0–100).
                   const conf = effectiveConfidence(pick);
                   const confPct = Math.max(0, Math.min(100, conf));
-                  const sample = effectiveBase(pick);
                   return (
                     <article
                       className={`pick-card ${locked ? 'pick-card-locked' : ''}`}
@@ -423,23 +435,11 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                         </button>
                       )}
                       <div className="pick-meta">
-                        <div className="pick-odds">
-                          <span className="pick-odds-label">Confidence</span>
-                          <span className="pick-odds-value">
-                            {conf.toFixed(1)}%
-                          </span>
-                        </div>
-                        <div className="pick-ev">
-                          <span className="pick-ev-label">Sample</span>
-                          <span className="pick-ev-value">
-                            {formatNumber(sample)}
-                          </span>
-                        </div>
-                        {pick.threshold !== null && (
-                          <div className="pick-stake">
-                            <span className="pick-stake-label">Sources</span>
-                            <span className="pick-stake-value">
-                              {pick.sourceCount}/{pick.threshold}
+                        {pick.odd !== null && (
+                          <div className="pick-odds">
+                            <span className="pick-odds-label">Odd</span>
+                            <span className="pick-odds-value">
+                              {pick.odd}
                             </span>
                           </div>
                         )}
@@ -451,25 +451,16 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
                             </span>
                           </div>
                         )}
-                      </div>
-                      {pick.isAIConfirmed && (
-                        <div
-                          className="pick-scores"
-                          title={pick.aiNote || undefined}
-                        >
-                          <span className="pick-scores-label">AI confirm</span>
-                          <div className="pick-scores-list">
-                            <span className="pick-score">
-                              {pick.isAIConfirmed === 'primary'
-                                ? 'Primary'
-                                : 'Secondary'}
-                              {pick.aiConfirmedConfidence !== null
-                                ? ` · ${pick.aiConfirmedConfidence.toFixed(1)}%`
-                                : ''}
+                        {/* Для прошедших дней — итог матча (resultScore). */}
+                        {selectedOffset !== 0 && (
+                          <div className="pick-ev">
+                            <span className="pick-ev-label">Result</span>
+                            <span className="pick-ev-value">
+                              {pick.resultScore ?? '—'}
                             </span>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                       <div className="pick-confidence">
                         <div className="pick-confidence-top">
                           <span>Confidence</span>
