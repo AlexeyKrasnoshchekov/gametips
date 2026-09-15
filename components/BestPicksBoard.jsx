@@ -26,8 +26,10 @@ import { useAuth } from './AuthContext';
 // resultScore показывается в карточках прошедших дней (не Today).
 // ---------------------------------------------------------------------------
 
-// Бесплатный лимит просмотра для неавторизованных — как на странице Home.
-const FREE_PREVIEW_LIMIT = 4;
+// Бесплатный просмотр для неавторизованных: по одной карточке в каждой
+// категории (Home Win, Away Win, …). Какая именно карточка открыта —
+// выбирается детерминированно-случайно (см. freePickKeyForCategory).
+const FREE_PREVIEW_PER_CATEGORY = 1;
 
 // Дневные фильтры — тот же состав, порядок и подписи, что на странице Home
 // (старые даты слева, Today последним).
@@ -175,6 +177,28 @@ function serverTopPicksForCategory(picks) {
     .sort((a, b) => (a.topPickRank ?? 99) - (b.topPickRank ?? 99));
 }
 
+// Простой строковый хеш (djb2-подобный) — нужен вместо Math.random, чтобы
+// SSR и гидрация выбирали одну и ту же карточку и она не «мигала» при
+// перерисовках.
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+// Ключ бесплатно открытой карточки категории. Хешируем дату и состав пиков
+// категории, поэтому для посетителя выбор выглядит случайным и меняется
+// вместе с пиками дня, но остаётся одинаковым внутри одного рендера/даты.
+function freePickKeyForCategory(cat, seed) {
+  if (!cat.picks.length) return null;
+  const signature = `${seed}|${cat.key}|${cat.picks
+    .map((pick) => pick.key)
+    .join(',')}`;
+  return cat.picks[hashString(signature) % cat.picks.length].key;
+}
+
 export default function BestPicksBoard({ initialPicks, initialError }) {
   const [picks, setPicks] = useState(initialPicks);
   const [error, setError] = useState(initialError);
@@ -254,20 +278,26 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
     [categories],
   );
 
-  // Бесплатный просмотр для неавторизованных — как на странице Home:
-  // первые 4 карточки по порядку вывода (категория → позиция в категории),
-  // остальные замылены. Выбор детерминированный, поэтому SSR и гидрация
-  // всегда совпадают. Если фильтр Даты не Today — показываем все карточки.
+  // Бесплатный просмотр для неавторизованных: открыта ровно одна карточка в
+  // каждой категории (Home Win, Away Win, …), остальные замылены. Карточку
+  // выбираем хешем от даты и состава пиков категории — выбор не зависит от
+  // Math.random, поэтому SSR и гидрация совпадают, а сам открытый матч
+  // меняется вместе с пиками дня. Если фильтр Даты не Today — открыто всё.
   const freePickKeys = useMemo(() => {
     if (user) return null; // авторизован — открыто всё
     if (selectedOffset !== 0) return null; // не Today — открыто всё
+    const seed = formatDateForApi(selectedOffset);
     const keys = new Set();
     for (const cat of categories) {
-      for (const pick of cat.picks) {
-        if (keys.size >= FREE_PREVIEW_LIMIT) break;
-        keys.add(pick.key);
+      const startKey = freePickKeyForCategory(cat, seed);
+      const start = startKey
+        ? cat.picks.findIndex((pick) => pick.key === startKey)
+        : -1;
+      if (start < 0) continue;
+      const limit = Math.min(FREE_PREVIEW_PER_CATEGORY, cat.picks.length);
+      for (let i = 0; i < limit; i += 1) {
+        keys.add(cat.picks[(start + i) % cat.picks.length].key);
       }
-      if (keys.size >= FREE_PREVIEW_LIMIT) break;
     }
     return keys;
   }, [user, categories, selectedOffset]);
