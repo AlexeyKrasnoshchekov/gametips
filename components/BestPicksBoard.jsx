@@ -20,7 +20,8 @@ import { useAuth } from './AuthContext';
 // Правила ранжирования на сервере: эффективный confidence (AI confidence у
 // подтверждённых) -> эффективный base -> для тоталов csAvgGoals.
 // Клиент ничего не отбирает сам: только фильтрует отмеченные пики по
-// категориям и сортирует их по topPickRank. Эффективные confidence/base
+// категориям и сортирует их по topPickRank. Фильтр по категории (чипы) —
+// чисто клиентский, поверх серверных маркеров. Эффективные confidence/base
 // (effectiveConfidence / effectiveBase) остаются только для отображения карточек.
 // ---------------------------------------------------------------------------
 
@@ -160,6 +161,8 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [selectedOffset, setSelectedOffset] = useState(0);
+  // Фильтр по категории: 'all' — показывать все категории с топ-пиками.
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const skipFirstFetch = useRef(true);
 
@@ -204,8 +207,9 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
 
   // Категории в фиксированном порядке; внутри каждой — только топ-пики,
   // отмеченные сервером (isTopPick), в порядке серверных рангов.
-  // Пустые категории не выводим.
-  const categories = useMemo(() => {
+  // Пустые категории не выводим. Список без учёта фильтра категорий —
+  // из него считаются счётчики и empty-state при активном фильтре.
+  const allCategories = useMemo(() => {
     const groups = new Map(CATEGORIES.map((cat) => [cat.key, []]));
     for (const pick of normalizedPicks) {
       const bucket = groups.get(pick.category);
@@ -216,6 +220,15 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
       picks: serverTopPicksForCategory(groups.get(cat.key) || []),
     })).filter((cat) => cat.picks.length > 0);
   }, [normalizedPicks]);
+
+  // Видимые категории — с учётом фильтра по категории ('all' — все).
+  const categories = useMemo(
+    () =>
+      selectedCategory === 'all'
+        ? allCategories
+        : allCategories.filter((cat) => cat.key === selectedCategory),
+    [allCategories, selectedCategory]
+  );
 
   const totalPicks = useMemo(
     () => categories.reduce((sum, cat) => sum + cat.picks.length, 0),
@@ -271,7 +284,7 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
         </h1>
         <p>
           {totalPicks > 0
-            ? `${totalPicks} top picks across ${categories.length} markets — crowd consensus ranked by backtested hit rate, with AI-confirmed selections highlighted. Up to 10 matches per market.`
+            ? `${totalPicks} top picks across ${categories.length} market${categories.length === 1 ? '' : 's'} — crowd consensus ranked by backtested hit rate, with AI-confirmed selections highlighted. Up to 10 matches per market.`
             : 'The strongest football predictions of the day, grouped by market — crowd consensus ranked by backtested hit rate, with AI-confirmed selections highlighted.'}
         </p>
       </section>
@@ -287,6 +300,27 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
           >
             <i className="fa-regular fa-calendar-days"></i>{' '}
             {getDayLabel(opt.offset)}
+          </button>
+        ))}
+      </div>
+
+      {/* Фильтр по категориям — те же чипы: All markets + 9 рынков.
+          Отбор топ-пиков всё равно серверный (isTopPick), чипы лишь
+          сужают вывод до выбранной категории. */}
+      <div className="filters" style={{ paddingBottom: '0', marginTop: '16px' }}>
+        <button
+          className={`filter-btn ${selectedCategory === 'all' ? 'active' : ''}`}
+          onClick={() => setSelectedCategory('all')}
+        >
+          <i className="fa-solid fa-layer-group"></i> All markets
+        </button>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.key}
+            className={`filter-btn ${selectedCategory === cat.key ? 'active' : ''}`}
+            onClick={() => setSelectedCategory(cat.key)}
+          >
+            <i className={`fa-solid ${cat.icon}`}></i> {cat.label}
           </button>
         ))}
       </div>
@@ -324,7 +358,19 @@ export default function BestPicksBoard({ initialPicks, initialError }) {
         {!loading && !error && totalPicks === 0 && (
           <div className="state-box">
             <i className="fa-regular fa-calendar-xmark"></i>
-            <p>No best picks published yet. Please check back later.</p>
+            <p>
+              {selectedCategory !== 'all' && allCategories.length > 0
+                ? `No top picks in the ${CATEGORY_LABEL[selectedCategory]} market yet.`
+                : 'No best picks published yet. Please check back later.'}
+            </p>
+            {selectedCategory !== 'all' && allCategories.length > 0 && (
+              <button
+                className="retry-btn"
+                onClick={() => setSelectedCategory('all')}
+              >
+                Show all markets
+              </button>
+            )}
           </div>
         )}
 
