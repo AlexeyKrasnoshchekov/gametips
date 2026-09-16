@@ -298,6 +298,13 @@ export default function AuthModal({ open, onClose, notice, onAuthenticated }) {
             </>
           )}
         </p>
+
+        {mode === 'login' && (
+          <p className="auth-support">
+            <i className="fa-solid fa-envelope"></i> if you face any error write us{' '}
+            <a href="mailto:support@gametips.bet">support@gametips.bet</a>
+          </p>
+        )}
           </>
         )}
       </div>

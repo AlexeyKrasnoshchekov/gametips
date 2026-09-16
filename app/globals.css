@@ -937,6 +937,20 @@ footer i{color:var(--accent);}
 }
 .auth-switch button:hover{text-decoration:underline;}
 
+/* Строка поддержки под формой Sign In («if you face any error…») */
+.auth-support{
+    text-align:center;
+    color:var(--text-dim);
+    font-size:12px;
+    margin:14px 0 0;
+}
+.auth-support i{color:var(--accent);}
+.auth-support a{
+    color:var(--accent);
+    text-decoration:none;
+}
+.auth-support a:hover{text-decoration:underline;}
+
 @media (max-width:820px){
     nav.main-nav{display:none;}
     .burger{display:flex;}
