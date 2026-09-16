@@ -5,6 +5,7 @@
 // поэтому сессия восстанавливается одним запросом /api/auth/me на страницу.
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import AuthModal, { AUTH_ERROR_MESSAGES } from './AuthModal';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const AuthContext = createContext(null);
 
@@ -18,6 +19,8 @@ export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authNotice, setAuthNotice] = useState('');
+  // Отдельная модалка смены пароля (для вошедшего пользователя)
+  const [changeOpen, setChangeOpen] = useState(false);
 
   // Restore the session on load and surface ?authError= / ?verified= query
   // params: they come back from the Google OAuth callback and from the email
@@ -82,6 +85,9 @@ export default function AuthProvider({ children }) {
   // Открыть модалку авторизации из любого места (хедер, замки карточек).
   const openAuth = useCallback(() => setAuthOpen(true), []);
 
+  // Открыть модалку смены пароля (доступна только вошедшему пользователю).
+  const openChangePassword = useCallback(() => setChangeOpen(true), []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,6 +98,7 @@ export default function AuthProvider({ children }) {
         authNotice,
         setAuthNotice,
         openAuth,
+        openChangePassword,
         handleSignOut,
       }}
     >
@@ -104,6 +111,9 @@ export default function AuthProvider({ children }) {
         notice={authNotice}
         onAuthenticated={handleAuthenticated}
       />
+      {/* Модалка смены пароля — та же схема: рендерится здесь, открывается
+          через openChangePassword() из контекста (кнопка-ключ в хедере). */}
+      <ChangePasswordModal open={changeOpen} onClose={() => setChangeOpen(false)} />
     </AuthContext.Provider>
   );
 }

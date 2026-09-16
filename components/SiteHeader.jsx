@@ -23,7 +23,7 @@ function isActive(pathname, href) {
 export default function SiteHeader({ badge }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, openAuth, handleSignOut } = useAuth();
+  const { user, openAuth, openChangePassword, handleSignOut } = useAuth();
 
   const badgeContent = badge || (
     <>
@@ -63,6 +63,14 @@ export default function SiteHeader({ badge }) {
               <span className="user-name">{user.name}</span>
               <button
                 className="user-signout"
+                onClick={openChangePassword}
+                aria-label="Change password"
+                title="Change password"
+              >
+                <i className="fa-solid fa-key"></i>
+              </button>
+              <button
+                className="user-signout"
                 onClick={handleSignOut}
                 aria-label="Sign out"
                 title="Sign out"
@@ -98,9 +106,14 @@ export default function SiteHeader({ badge }) {
           </a>
         ))}
         {user ? (
-          <button className="mobile-auth-btn" onClick={handleSignOut}>
-            <i className="fa-solid fa-arrow-right-from-bracket"></i> Sign out ({user.name})
-          </button>
+          <>
+            <button className="mobile-auth-btn" onClick={openChangePassword}>
+              <i className="fa-solid fa-key"></i> Change password ({user.name})
+            </button>
+            <button className="mobile-auth-btn" onClick={handleSignOut}>
+              <i className="fa-solid fa-arrow-right-from-bracket"></i> Sign out ({user.name})
+            </button>
+          </>
         ) : (
           <button
             className="mobile-auth-btn"
