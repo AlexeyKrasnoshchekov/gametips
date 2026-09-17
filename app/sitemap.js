@@ -1,12 +1,14 @@
 import { SITE_URL } from '@/lib/site';
-import { blogPosts } from '@/lib/blogPosts';
+import { getBlogPosts } from '@/lib/blog';
 
 // Карта сайта для поисковиков — Next.js отдаёт её по адресу /sitemap.xml.
-// Посты блога берутся из lib/blogPosts.js (новый пост попадает сюда сам).
-// revalidate — .xml обновляется не чаще раза в час (lastModified = момент генерации).
+// Посты блога теперь живые: lib/blog.js объединяет статьи из SEObot API и
+// статичный резерв lib/blogPosts.js (новый пост попадает сюда сам).
+// revalidate — .xml обновляется не чаще раза в час.
 export const revalidate = 3600;
 
-export default function sitemap() {
+export default async function sitemap() {
+  const posts = await getBlogPosts();
   const lastModified = new Date();
 
   return [
@@ -52,11 +54,12 @@ export default function sitemap() {
       changeFrequency: 'yearly',
       priority: 0.3,
     },
-    ...blogPosts.map((post) => ({
+    ...posts.map((post) => ({
       url: `${SITE_URL}/blog/${post.slug}`,
-      lastModified: new Date(post.date),
+      lastModified: post.date ? new Date(post.date) : lastModified,
       changeFrequency: 'monthly',
       priority: 0.5,
     })),
   ];
 }
+

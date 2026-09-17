@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "blog:add": "node scripts/add-post.mjs",
+    "blog:sync": "node scripts/add-post.mjs --api"
   },
   "dependencies": {
     "@next/third-parties": "^16.3.3",

@@ -1,12 +1,30 @@
 import { SITE_URL } from '@/lib/site';
+import { getBlogPosts } from '@/lib/blog';
 
 // llms.txt — стандарт (llmstxt.org) для LLM-краулеров: краткое markdown-описание
 // сайта и его страниц, чтобы языковые модели корректно понимали контент.
 // Отдаётся по адресу /llms.txt с Content-Type: text/markdown.
+// Список статей блога строится динамически из lib/blog.js (живые статьи SEObot
+// + статичный резерв) — настройка перенесена из примера seobot-nextjs-blog.
 // revalidate — пересборка не чаще раза в час (актуально при смене страниц).
 export const revalidate = 3600;
 
-const CONTENT = `# GameTips
+// Квадратные скобки ломают markdown-ссылку — экранируем их в заголовках.
+const escapeMd = (text) => String(text).replace(/[\[\]]/g, '');
+
+export async function GET() {
+  const posts = await getBlogPosts();
+  const blogLines = posts
+    .map(
+      (post) =>
+        `- [${escapeMd(post.title)}](${SITE_URL}/blog/${post.slug})${
+          post.description ? `: ${post.description}` : ''
+        }`
+    )
+    .join('\n');
+
+  const CONTENT = `# GameTips
+
 
 > GameTips (${SITE_URL.replace(/^https?:\/\//, '')}) is a football predictions and betting tips website. Every day it aggregates forecasts from multiple trusted sources, combines them with bookmaker odds, implied probabilities and edge analysis, and publishes correct score forecasts, Over/Under totals, Both Teams to Score (BTTS), Home Win and Away Win tips, plus a daily curated "Best Picks" shortlist with confidence ratings and bookmaker odds.
 
@@ -19,9 +37,7 @@ const CONTENT = `# GameTips
 
 ## Blog articles
 
-- [How to Read Football Odds: Implied Probability Explained](${SITE_URL}/blog/how-to-read-football-odds): the implied probability formula, the bookmaker margin and how to spot value in football odds.
-- [Over/Under Goals Markets: A Practical Guide](${SITE_URL}/blog/over-under-goals-guide): what Over 1.5 / 2.5 and Under 2.5 / 3.5 mean, which factors drive goal totals and how to use aggregated predictions.
-- [BTTS Betting Explained: When Both Teams to Score Has Value](${SITE_URL}/blog/btts-value-guide): how the BTTS market works, which match profiles favour BTTS Yes and when to be careful.
+${blogLines}
 
 ## Policies
 
@@ -36,7 +52,6 @@ const CONTENT = `# GameTips
 - Content is for informational purposes only. Betting involves risk — no outcome is guaranteed.
 `;
 
-export function GET() {
   return new Response(CONTENT, {
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',

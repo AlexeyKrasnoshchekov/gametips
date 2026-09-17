@@ -68,3 +68,113 @@
 .blog-article .legal-updated {
   margin-bottom: 24px;
 }
+
+/* Сырой HTML-контент внутри статьи (блок type: 'html' из lib/blogPosts.js):
+   таблицы, figure и iframe приходят из внешних статей (SEObot) и стилизуются здесь. */
+.blog-article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.blog-article th,
+.blog-article td {
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+}
+
+.blog-article th {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.blog-article img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.blog-article figure {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.blog-article figcaption {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+.blog-article iframe {
+  max-width: 100%;
+  border: 0;
+  border-radius: 12px;
+}
+
+/* Живая статья из SEObot: главное изображение. */
+.blog-article .blog-hero {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+
+/* Связанные статьи (relatedPosts живой статьи из SEObot). */
+.blog-related {
+  margin-top: 28px;
+}
+
+.blog-related h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+
+.blog-related ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.blog-related a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.blog-related a:hover {
+  text-decoration: underline;
+}
+
+/* Пагинация списка блога (/blog?page=N) — как в примере seobot-nextjs-blog. */
+.blog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 26px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.blog-pagination a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.blog-pagination a:hover {
+  text-decoration: underline;
+}
+
