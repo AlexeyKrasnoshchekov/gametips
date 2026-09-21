@@ -88,17 +88,21 @@ nav.main-nav a.active{
     font-size:16px;
 }
 .mobile-menu{
-    display:none;
+    display:flex;
     flex-direction:column;
     gap:4px;
     border-bottom:1px solid var(--border);
     background:var(--bg-soft);
     overflow:hidden;
     max-height:0;
-    transition:max-height .3s ease;
+    /* visibility прячет и рамку/фон, пока меню свёрнуто (на десктопе тоже) */
+    visibility:hidden;
+    transition:max-height .3s ease, visibility .3s ease;
 }
 .mobile-menu.open{
-    max-height:320px;
+    /* 420px хватает на 4 ссылки + 2 кнопки авторизации у залогиненного юзера */
+    max-height:420px;
+    visibility:visible;
 }
 .mobile-menu a{
     padding:16px 32px;
@@ -966,16 +970,6 @@ footer i{color:var(--accent);}
     .signin-label{display:none;}
     .brand-logo{height:30px;}
     .signin-btn{padding:8px 10px;}
-}
-@media (max-width:820px){
-    nav.main-nav{display:none;}
-    .burger{display:flex;}
-}
-@media (max-width:600px){
-    header{padding:18px;}
-    .hero{padding:36px 18px 16px;}
-    .filters{padding:0 18px 24px;}
-    main{padding:0 18px 60px;}
 }
 
 /* ---------------------------------------------------------------------------
