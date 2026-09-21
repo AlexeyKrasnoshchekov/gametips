@@ -224,25 +224,37 @@ export default function MatchCard({
   // 1X2 / DNB predictions. The API has no bookmaker odds for these, so they
   // render with odd "N/A" (same as the BTTS fallback) and rely on the
   // historical weight plus the win-source split (win.winHome / win.winAway).
-  if (match.probWeightHomeWin !== undefined) {
+  // probWeightHomeWin / probWeightAwayWin are only present for matches where
+  // the model backs the home/away side respectively, so fall back to the DNB
+  // weight when missing — otherwise matches with a clear win-source consensus
+  // (e.g. winAway >= 3) would vanish from the Home Win / Away Win filters.
+  const homeWinWeight =
+    match.probWeightHomeWin !== undefined
+      ? match.probWeightHomeWin
+      : match.probWeightHomeDnb;
+  if (homeWinWeight !== undefined || (match.win && match.win.winHome !== undefined)) {
     stats.push({
       key: 'Home Win',
       type: 'Home Win',
       odd: match.homeWinOdd || 'N/A',
       imp: match.homeWinImpProb || null,
-      weight: match.probWeightHomeWin,
+      weight: homeWinWeight,
       res: normalizeRes(match.homeWinRes),
       count: match.win ? match.win.winHome : null,
       icon: 'fa-house',
     });
   }
-  if (match.probWeightAwayWin !== undefined) {
+  const awayWinWeight =
+    match.probWeightAwayWin !== undefined
+      ? match.probWeightAwayWin
+      : match.probWeightAwayDnb;
+  if (awayWinWeight !== undefined || (match.win && match.win.winAway !== undefined)) {
     stats.push({
       key: 'Away Win',
       type: 'Away Win',
       odd: match.awayWinOdd || 'N/A',
       imp: match.awayWinImpProb || null,
-      weight: match.probWeightAwayWin,
+      weight: awayWinWeight,
       res: normalizeRes(match.awayWinRes),
       count: match.win ? match.win.winAway : null,
       icon: 'fa-plane-departure',
